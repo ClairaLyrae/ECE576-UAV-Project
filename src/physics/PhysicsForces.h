@@ -1,8 +1,8 @@
-#ifndef PHYSICS_FORCES_H_
-#define PHYSICS_FORCES_H_
+#ifndef PHYSICS_FORCE_H_
+#define PHYSICS_FORCE_H_
 
 #include <systemc.h>
-#include "Physics.h"
+#include "PhysicsObjects.h"
 
 using namespace gmtl;
 
@@ -15,8 +15,8 @@ public:
 		this->gvec = gvec;
 	}
 
-	void update(double delta, PhysicsObject parent) {
-		parent.pos_vel += gvec*delta;
+	void update(double delta, PhysicsObject &parent) {
+		parent.velocity += gvec*delta;
 	}
 };
 
@@ -33,8 +33,8 @@ public:
 		this->area = area;
 	}
 
-	void update(double delta, PhysicsObject parent) {
-		parent.pos_vel = parent.pos_vel + 0.5*density*(parent.pos_vel*parent.pos_vel)*coeff*area*delta;
+	void update(double delta, PhysicsObject &parent) {
+
 	}
 };
 

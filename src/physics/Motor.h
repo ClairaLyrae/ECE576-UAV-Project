@@ -2,7 +2,7 @@
 #define PHYSICS_COMP_H_
 
 #include <systemc.h>
-#include "Physics.h"
+#include "PhysicsObjects.h"
 
 using namespace gmtl;
 
@@ -23,7 +23,7 @@ public:
 		// Process PWM signals
 	}
 
-	void update(double delta, PhysicsObject parent) {
+	void update(double delta, PhysicsObject &parent) {
 		// Update physics object velocities based on motor thrust curve
 		// Apply torque and lin vel
 	}

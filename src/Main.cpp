@@ -1,14 +1,24 @@
 #include <systemc.h>
 #include <ctime>
 
-#include "gmtl.h"
+#include "gmtl/gmtl.h"
 #include "Sensors.h"
-#include "Physics.h"
 #include "Processor.h"
 #include "HardwareAccel.h"
-#include "sensors/Barometer.h"
+#include "Physics.h"
+#include "Actuators.h"
 
 using namespace gmtl;
+
+#define PHYSICS_SIM_TIME 100
+#define PHYSICS_STEP_MS 10
+#define PHYSICS_GRAVITY -9.80665
+#define PHYSICS_DRAG_COEFF 0.4
+
+#define UAV_MASS 	10
+#define UAV_LENGTH 	0.5
+#define UAV_WIDTH 	0.5
+#define UAV_HEIGHT 	0.1
 
 // Top Module
 class Top : public sc_module
@@ -17,7 +27,7 @@ public:
 	HardwareAccel* hardware;
 	Processor* proc;
 
-	Physics* phys;
+	PhysicsSim* phys;
 	Motor* motor_1;
 	Motor* motor_2;
 	Motor* motor_3;
@@ -48,21 +58,22 @@ public:
 		sensor_gyro = new Gyroscope("SENSOR_GYRO");
 
 		// Physics Module
-		phys = new Physics("PHYSICS");
-		uav = new PhysicsObject(10.0);
-		motor_1 = new Motor(Vec3d(1, 1, 0));
-		motor_2 = new Motor(Vec3d(1, -1, 0));
-		motor_3 = new Motor(Vec3d(-1, -1, 0));
-		motor_4 = new Motor(Vec3d(-1, 1, 0));
-		grav = new Gravity(Vec3d(0, 0, -9.8));
-		drag = new Drag(1, 1, 1);
-		uav->addComponent(*motor_1);
-		uav->addComponent(*motor_2);
-		uav->addComponent(*motor_3);
-		uav->addComponent(*motor_4);
-		uav->addComponent(*grav);
-		uav->addComponent(*drag);
-		phys->addObject(*uav);
+		phys = new PhysicsSim("PHYSICS_SIM", PHYSICS_STEP_MS, PHYSICS_SIM_TIME);
+		uav = new PhysicsObject(UAV_MASS, UAV_LENGTH, UAV_WIDTH, UAV_HEIGHT);
+		motor_1 = new Motor("MOTOR_1", Vec3d(1, 1, 0));
+		motor_2 = new Motor("MOTOR_2", Vec3d(1, -1, 0));
+		motor_3 = new Motor("MOTOR_3", Vec3d(-1, -1, 0));
+		motor_4 = new Motor("MOTOR_4", Vec3d(-1, 1, 0));
+		grav = new Gravity(Vec3d(0, 0, PHYSICS_GRAVITY));
+		drag = new Drag(1, PHYSICS_DRAG_COEFF, 1);
+		uav->addComponent(motor_1);
+		uav->addComponent(motor_2);
+		uav->addComponent(motor_3);
+		uav->addComponent(motor_4);
+		uav->addComponent(grav);
+		//uav->addComponent(drag);
+		uav->enableLog("uav.txt");
+		phys->addObject(uav);
 	}
 };
 

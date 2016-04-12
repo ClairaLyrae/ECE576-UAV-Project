@@ -28,7 +28,9 @@
 								<option id="gnu.cpp.compiler.cygwin.exe.debug.option.debugging.level.1677232089" name="Debug Level" superClass="gnu.cpp.compiler.cygwin.exe.debug.option.debugging.level" value="gnu.cpp.compiler.debugging.level.max" valueType="enumerated"/>
 								<option id="gnu.cpp.compiler.option.include.paths.2087330645" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" valueType="includePath">
 									<listOptionValue builtIn="false" value="&quot;C:\Storage\Programming\C++\Libraries\SystemC\systemc-2.3.1\include&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/UAV Project/gmtl-0.6.1/}&quot;"/>
 								</option>
+								<option id="gnu.cpp.compiler.option.other.other.415517942" superClass="gnu.cpp.compiler.option.other.other" value="-c -fmessage-length=0 -std=c++11" valueType="string"/>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.compiler.input.cygwin.2101742325" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.input.cygwin"/>
 							</tool>
 							<tool id="cdt.managedbuild.tool.gnu.c.compiler.cygwin.exe.debug.1621686998" name="Cygwin C Compiler" superClass="cdt.managedbuild.tool.gnu.c.compiler.cygwin.exe.debug">
@@ -52,7 +54,6 @@
 						</toolChain>
 					</folderInfo>
 					<sourceEntries>
-						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="gmtl-0.6.1/gmtl"/>
 						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="src"/>
 					</sourceEntries>
 				</configuration>
@@ -111,21 +112,28 @@
 	<storageModule moduleId="cdtBuildSystem" version="4.0.0">
 		<project id="Homework.cdt.managedbuild.target.gnu.cygwin.exe.1589431255" name="Executable" projectType="cdt.managedbuild.target.gnu.cygwin.exe"/>
 	</storageModule>
+	<storageModule moduleId="org.eclipse.cdt.core.LanguageSettingsProviders"/>
+	<storageModule moduleId="refreshScope" versionNumber="2">
+		<configuration configurationName="Debug">
+			<resource resourceType="PROJECT" workspacePath="/UAV Project"/>
+		</configuration>
+		<configuration configurationName="Release">
+			<resource resourceType="PROJECT" workspacePath="/UAV Project"/>
+		</configuration>
+	</storageModule>
 	<storageModule moduleId="scannerConfiguration">
 		<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
-		<scannerConfigBuildInfo instanceId="cdt.managedbuild.config.gnu.cygwin.exe.release.1499130744;cdt.managedbuild.config.gnu.cygwin.exe.release.1499130744.;cdt.managedbuild.tool.gnu.cpp.compiler.cygwin.exe.release.1352914100;cdt.managedbuild.tool.gnu.cpp.compiler.input.cygwin.1442568328">
+		<scannerConfigBuildInfo instanceId="cdt.managedbuild.config.gnu.cygwin.exe.debug.1309712456;cdt.managedbuild.config.gnu.cygwin.exe.debug.1309712456.;cdt.managedbuild.tool.gnu.c.compiler.cygwin.exe.debug.1621686998;cdt.managedbuild.tool.gnu.c.compiler.input.cygwin.1519031552">
 			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
 		</scannerConfigBuildInfo>
-		<scannerConfigBuildInfo instanceId="cdt.managedbuild.config.gnu.cygwin.exe.debug.1309712456;cdt.managedbuild.config.gnu.cygwin.exe.debug.1309712456.;cdt.managedbuild.tool.gnu.cpp.compiler.cygwin.exe.debug.1303578338;cdt.managedbuild.tool.gnu.cpp.compiler.input.cygwin.2101742325">
+		<scannerConfigBuildInfo instanceId="cdt.managedbuild.config.gnu.cygwin.exe.release.1499130744;cdt.managedbuild.config.gnu.cygwin.exe.release.1499130744.;cdt.managedbuild.tool.gnu.cpp.compiler.cygwin.exe.release.1352914100;cdt.managedbuild.tool.gnu.cpp.compiler.input.cygwin.1442568328">
 			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
 		</scannerConfigBuildInfo>
 		<scannerConfigBuildInfo instanceId="cdt.managedbuild.config.gnu.cygwin.exe.release.1499130744;cdt.managedbuild.config.gnu.cygwin.exe.release.1499130744.;cdt.managedbuild.tool.gnu.c.compiler.cygwin.exe.release.319819407;cdt.managedbuild.tool.gnu.c.compiler.input.cygwin.483978156">
 			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
 		</scannerConfigBuildInfo>
-		<scannerConfigBuildInfo instanceId="cdt.managedbuild.config.gnu.cygwin.exe.debug.1309712456;cdt.managedbuild.config.gnu.cygwin.exe.debug.1309712456.;cdt.managedbuild.tool.gnu.c.compiler.cygwin.exe.debug.1621686998;cdt.managedbuild.tool.gnu.c.compiler.input.cygwin.1519031552">
+		<scannerConfigBuildInfo instanceId="cdt.managedbuild.config.gnu.cygwin.exe.debug.1309712456;cdt.managedbuild.config.gnu.cygwin.exe.debug.1309712456.;cdt.managedbuild.tool.gnu.cpp.compiler.cygwin.exe.debug.1303578338;cdt.managedbuild.tool.gnu.cpp.compiler.input.cygwin.2101742325">
 			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
 		</scannerConfigBuildInfo>
 	</storageModule>
-	<storageModule moduleId="org.eclipse.cdt.core.LanguageSettingsProviders"/>
-	<storageModule moduleId="refreshScope"/>
 </cproject>

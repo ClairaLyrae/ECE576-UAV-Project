@@ -2,7 +2,7 @@
 #define GPS_H_
 
 #include <systemc.h>
-#include "Physics.h"
+#include "PhysicsObjects.h"
 
 using namespace gmtl;
 
@@ -19,7 +19,7 @@ public:
 		// Respond to I2C bus
 	}
 
-	void update(double delta, PhysicsObject parent) {
+	void update(double delta, PhysicsObject &parent) {
 		// Update sensor data from physics object
 	}
 };
