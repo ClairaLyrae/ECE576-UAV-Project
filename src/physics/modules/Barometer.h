@@ -2,9 +2,7 @@
 #define BAROMETER_H_
 
 #include <systemc.h>
-#include "PhysicsObjects.h"
-
-using namespace gmtl;
+#include "../Physics.h"
 
 class Barometer : public PhysicsComponent, public sc_module
 {
@@ -19,7 +17,7 @@ public:
 		// Respond to I2C bus
 	}
 
-	void update(double delta, PhysicsObject &parent) {
+	void update(double delta, PhysicsSim &sim, PhysicsObject &parent) {
 		// Update sensor data from physics object
 	}
 };
