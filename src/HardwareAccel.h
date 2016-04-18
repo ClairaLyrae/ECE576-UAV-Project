@@ -9,7 +9,7 @@
 #define TRAJ_HORIZ 1
 #define TRAJ_BALLISTIC 2
 #define TRAJ_UNFLIP 3
-#define TRAJ_TYPE TRAJ_BALLISTIC
+#define TRAJ_TYPE TRAJ_HORIZ
 
 // Hardware Module
 class HardwareAccel : public sc_module
