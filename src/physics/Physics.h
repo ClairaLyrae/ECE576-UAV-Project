@@ -8,8 +8,13 @@
 using namespace gmtl;
 using namespace std;
 
+#define AIR_MOLAR_MASS 0.0289644
+#define TEMP_LAPSE_RATE 0.0065
+#define GAS_CONSTANT 8.31447
 #define EARTH_GRAVITY 9.80665
 #define AIR_DENSITY 1.225
+#define STP_TEMP 15
+#define STP_PRESSURE 101325
 
 class PhysicsObject;
 class PhysicsComponent;
@@ -17,21 +22,21 @@ class PhysicsComponent;
 // Physics SystemC Thread
 class PhysicsSim : public sc_module
 {
-public:
+private:
 	vector<PhysicsObject*> objects;
 
-	// Timing variables
 	double delta_ms;
-	double time;
 	double sim_time;
-
-	// Environment variables
-	double density;
-	Vec3d gravity;
-
-	// SystemC Variables
+	double time;
 	sc_event event_sim_delta;
 	sc_event event_sim_trigger;
+public:
+	// Timing variables
+
+	// Environment variables
+	double temperature;
+	double density;
+	Vec3d gravity;
 
 	SC_HAS_PROCESS(PhysicsSim);
 
@@ -42,6 +47,7 @@ public:
 		this->time = 0;
 		this->density = AIR_DENSITY;
 		this->gravity = Vec3d(0, 0, -EARTH_GRAVITY);
+		this->temperature = STP_TEMP;
 	}
 
 	PhysicsSim(sc_module_name name, double delta_ms) : PhysicsSim(name, delta_ms, 0) {}
@@ -52,6 +58,17 @@ public:
 
 	double timeElapsed() {
 		return time;
+	}
+
+	double pressureAtAltitude(double z) {
+		double A = (EARTH_GRAVITY*AIR_MOLAR_MASS)/(GAS_CONSTANT*TEMP_LAPSE_RATE);
+		double B = TEMP_LAPSE_RATE/STP_TEMP;
+		return STP_PRESSURE*pow(1 - ((TEMP_LAPSE_RATE*z)/STP_TEMP), A);
+	}
+
+	double densityAtAltitude(double z) {
+		double A = (EARTH_GRAVITY*AIR_MOLAR_MASS)/(GAS_CONSTANT*TEMP_LAPSE_RATE);
+		return STP_PRESSURE*pow(STP_TEMP/(STP_TEMP + (TEMP_LAPSE_RATE*z)), 1 + A);
 	}
 
 	void main();
@@ -65,12 +82,17 @@ private:
 	string outfilename;
 	bool enablelog;
 	double time;
+	Vec3d orientation_vec;
 	AxisAngled orientation_aa;
+	AxisAngled rotation_aa;
+	Quatd rotation_q;
 public:
 	Point3d position;
 	Vec3d velocity;
+	Vec3d acceleration;
 	Quatd orientation;
 	Vec3d rotation;
+	Vec3d angularAcceleration;
 	double dimensions[3];
 	double mass;
 
@@ -86,6 +108,22 @@ public:
 		this->dimensions[0] = length;
 		this->dimensions[1] = width;
 		this->dimensions[2] = height;
+	}
+
+	Quatd rotationQuaternion() {
+		return rotation_q;
+	}
+
+	AxisAngled rotationAxisAngle() {
+		return rotation_aa;
+	}
+
+	AxisAngled orientationAxisAngle() {
+		return orientation_aa;
+	}
+
+	Vec3d orientationNormal() {
+		return orientation_vec;
 	}
 
 	bool enableLog(string ofile) {
@@ -108,12 +146,6 @@ public:
 
 	void addComponent(PhysicsComponent* p) {
 		components.push_back(p);
-	}
-
-	Vec3d upDirection() {
-		Vec3d norm(0,0,1);
-		xform(norm, orientation, norm);
-		return norm;
 	}
 
 	void update(double delta, PhysicsSim &sim);
@@ -154,23 +186,33 @@ void PhysicsObject::update(double delta, PhysicsSim &sim) {
 	}
 	force += sim.gravity*mass;	// Gravity force
 
-	// Propagate sum of forces to velocity change
-	velocity += force*(delta/mass);
-	rotation += torque*(delta/mass);
+	// Propagate sum of forces to acceleration
+	acceleration = force/mass;
+	angularAcceleration = torque/mass;
+
+	// Propagate acceleration to velocities
+	velocity += acceleration*delta;
+	rotation += angularAcceleration*delta;
 
 	// Propagate velocities to position/orientation
-	position = position + velocity*delta;
-	Quatd av;
-	set(av, AxisAngled(length(rotation), rotation.mData[0], rotation.mData[1], rotation.mData[2]));
-	slerp(orientation, delta, orientation, orientation*av, false);
+	position += velocity*delta;
+	Vec3d rnorm(rotation);
+	normalize(rnorm);
+	rotation_aa.set(length(rotation), rnorm.mData[0], rnorm.mData[1], rnorm.mData[2]);
+	set(rotation_q, rotation_aa);
+	normalize(rotation_q);
+	slerp(orientation, delta, orientation, orientation*rotation_q, false);
+	normalize(orientation);
 
-	// Update axis-angle representation
+	// Update axis-angle/vector representation
 	set(orientation_aa, orientation);
+	orientation_vec.set(0,0,1);
+	xform(orientation_vec, orientation, orientation_vec);
 
 	// Log physics state
 	if(enablelog) {
-		//outfile << time << "\t" << position << "\t" << velocity << "\t" << orientation_aa << "\t" << rotation << endl;
-		outfile << time << "\t" << position.mData[0] << "\t" << position.mData[1] << "\t" << position.mData[2] << endl;
+		//outfile << time << "\t" << position << "\t" << velocity << "\t" << orientation_aa << "\t" << rotation << force << torque << endl;
+		outfile << time << "\t" << position.mData[0] << "\t" << position.mData[1] << "\t" << position.mData[2] << "\t" << orientation_vec.mData[0] << "\t" << orientation_vec.mData[1] << "\t" << orientation_vec.mData[2] << endl;
 	}
 	time += delta;	// Update total time elapsed
 

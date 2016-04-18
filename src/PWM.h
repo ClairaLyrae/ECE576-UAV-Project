@@ -7,15 +7,15 @@
 class PWM_out : virtual public sc_interface
 {
 public:
-   virtual void writePWM(double duty);
+   virtual void writePWM(double duty) = 0;
 };
 
 // PWM Receiver Interface
 class PWM_in : virtual public sc_interface
 {
 public:
-   virtual double readPWM();
-   virtual double listenPWM();
+   virtual double readPWM() = 0;
+   virtual double listenPWM() = 0;
 };
 
 // PWM Bus Interface
@@ -31,11 +31,11 @@ public:
 
 	SC_HAS_PROCESS(PWM_bus);
 
-	PWM_bus(sc_module_name name, double period) : sc_module(name) {
+	PWM_bus(sc_module_name name, double freq) : sc_module(name) {
 		SC_THREAD(main);
 		this->duty = 0;
 		this->duty_new = 0;
-		this->period_ns = period;
+		this->period_ns = 1000000000.0/freq;
 	}
 
 	void main() {

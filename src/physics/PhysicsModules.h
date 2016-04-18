@@ -1,11 +1,10 @@
 #ifndef PHYSICS_MODULES_H_
 #define PHYSICS_MODULES_H_
 
-#include "modules/Accelerometer.h"
-#include "modules/Barometer.h"
-#include "modules/GPS.h"
-#include "modules/Gyroscope.h"
-#include "modules/Magnetometer.h"
+#include "modules/A2235H.h"
+#include "modules/LIS3MDL.h"
+#include "modules/LPS22HB.h"
+#include "modules/LSM6DS3.h"
 #include "modules/Motor.h"
 
 #endif

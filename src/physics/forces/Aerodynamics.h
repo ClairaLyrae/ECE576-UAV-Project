@@ -22,7 +22,7 @@ public:
 		Vec3d vnorm(parent.velocity);
 		normalize(vnorm);
 
-		// Cross sectional area of object
+		// Cross sectional area of object (simplistic assumption of worst-case)
 		double area = parent.dimensions[0]*parent.dimensions[1];
 
 		// Find linear drag force
@@ -30,6 +30,7 @@ public:
 		Vec3d dragforce = vnorm*drag;
 
 		// Find drag torque
+		// TODO determine drag on angular momentum
 
 		// Add forces to object
 		parent.force = parent.force + dragforce;
