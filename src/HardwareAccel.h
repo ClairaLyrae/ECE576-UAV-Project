@@ -30,35 +30,48 @@ public:
 	void main() {
 		switch(TRAJ_TYPE) {
 		case TRAJ_UNFLIP:
+			cout << "Set throttle to 100%" << endl;
 			setThrottle(1.0, 1.0, 1.0, 1.0);
 			wait(3000, SC_MS);
+			cout << "Set throttle to asymmetric" << endl;
 			setThrottle(1.0, 1.0, 0.0, 0.0);
 			wait(6000, SC_MS);
+			cout << "Set throttle to asymmetric opposite" << endl;
 			setThrottle(0.0, 0.0, 1.0, 1.0);
 			wait(6000, SC_MS);
+			cout << "Set throttle to 100%" << endl;
 			setThrottle(1.0, 1.0, 1.0, 1.0);
 			break;
 		case TRAJ_CHAOS:
+			cout << "Set throttle to  100%" << endl;
 			setThrottle(1.0, 1.0, 1.0, 1.0);
 			wait(3000, SC_MS);
+			cout << "Set throttle to arbitrary values (highly asymmetric)" << endl;
 			setThrottle(0.85, 0.2, 0.53, 0.1);
 			break;
 		case TRAJ_HORIZ:
+			cout << "Set throttle to 100%" << endl;
 			setThrottle(1.0, 1.0, 1.0, 1.0);
 			wait(1000, SC_MS);
+			cout << "Set throttle to slight turn" << endl;
 			setThrottle(0.5, 0.5, 0.482, 0.482);
 			wait(200, SC_MS);
+			cout << "Set throttle to slight opposite turn, zero rotation" << endl;
 			setThrottle(0.482, 0.482, 0.5, 0.5);
 			wait(200, SC_MS);
+			cout << "Set throttle to hover" << endl;
 			setThrottle(0.482, 0.482, 0.482, 0.482);
 			wait(15000, SC_MS);
 			setThrottle(0.0, 0.0, 0.0, 0.0);
 			break;
 		case TRAJ_BALLISTIC:
+			cout << "Set throttle to slight turn" << endl;
 			setThrottle(1, 1, 0.9, 0.9);
 			wait(1000, SC_MS);
+			cout << "Set throttle to slight opposite turn, zero rotation" << endl;
 			setThrottle(0.9, 0.9, 1.0, 1.0);
 			wait(1000, SC_MS);
+			cout << "Set throttle to zero (ballistic)" << endl;
 			setThrottle(0.0, 0.0, 0.0, 0.0);
 			wait(1000, SC_MS);
 			break;

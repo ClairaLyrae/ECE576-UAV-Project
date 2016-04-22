@@ -1,5 +1,5 @@
 % Import Positioning Data
-data = importdata('../uav_physics_log.txt');
+data = importdata('../uav_physics_log_horiz.txt');
 t=data(1:100:end,1);
 r=data(1:100:end,2:4);
 n=data(1:100:end,5:7);
