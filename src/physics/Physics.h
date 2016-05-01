@@ -8,13 +8,13 @@
 using namespace gmtl;
 using namespace std;
 
-#define AIR_MOLAR_MASS 0.0289644
-#define TEMP_LAPSE_RATE 0.0065
-#define GAS_CONSTANT 8.31447
-#define EARTH_GRAVITY 9.80665
-#define AIR_DENSITY 1.225
-#define STP_TEMP 15
-#define STP_PRESSURE 101325
+#define AIR_MOLAR_MASS 0.0289644	// kg/mol
+#define TEMP_LAPSE_RATE 0.0065		// K/m
+#define GAS_CONSTANT 8.31447		// J/(mol*K)
+#define EARTH_GRAVITY 9.80665		// m/s^2
+#define AIR_DENSITY 1.225			//
+#define STP_TEMP 288.15				// K
+#define STP_PRESSURE 101325			// Pa
 
 class PhysicsObject;
 class PhysicsComponent;
@@ -37,6 +37,7 @@ public:
 	double temperature;
 	double density;
 	Vec3d gravity;
+	Vec3d magfield;
 
 	SC_HAS_PROCESS(PhysicsSim);
 
@@ -47,6 +48,7 @@ public:
 		this->time = 0;
 		this->density = AIR_DENSITY;
 		this->gravity = Vec3d(0, 0, -EARTH_GRAVITY);
+		this->magfield = Vec3d(0.2416, 0.0429, 0.4037);	// Magnetic field at university of arizona
 		this->temperature = STP_TEMP;
 	}
 
@@ -60,15 +62,30 @@ public:
 		return time;
 	}
 
-	double pressureAtAltitude(double z) {
+	// Returns pressure in Pa
+	double getPressure(double altitude) {
 		double A = (EARTH_GRAVITY*AIR_MOLAR_MASS)/(GAS_CONSTANT*TEMP_LAPSE_RATE);
-		double B = TEMP_LAPSE_RATE/STP_TEMP;
-		return STP_PRESSURE*pow(1 - ((TEMP_LAPSE_RATE*z)/STP_TEMP), A);
+		return STP_PRESSURE*pow(getTemperature(altitude)/STP_TEMP, A);
 	}
 
-	double densityAtAltitude(double z) {
-		double A = (EARTH_GRAVITY*AIR_MOLAR_MASS)/(GAS_CONSTANT*TEMP_LAPSE_RATE);
-		return STP_PRESSURE*pow(STP_TEMP/(STP_TEMP + (TEMP_LAPSE_RATE*z)), 1 + A);
+	// Returns gravity in m/s^2
+	Vec3d getGravity() {
+		return gravity;
+	}
+
+	// Returns magnetic field in Gauss
+	Vec3d getMagneticField() {
+		return magfield;
+	}
+
+	// Returns density in kg/m^3
+	double getDensity(double altitude) {
+		return (getPressure(altitude)*AIR_MOLAR_MASS)/(GAS_CONSTANT*getTemperature(altitude));
+	}
+
+	// Returns temperature in K
+	double getTemperature(double altitude) {
+		return STP_TEMP - altitude*TEMP_LAPSE_RATE;
 	}
 
 	void main();
@@ -82,7 +99,8 @@ private:
 	string outfilename;
 	bool enablelog;
 	double time;
-	Vec3d orientation_vec;
+	Vec3d orientation_vec_up;
+	Vec3d orientation_vec_forward;
 	AxisAngled orientation_aa;
 	AxisAngled rotation_aa;
 	Quatd rotation_q;
@@ -123,7 +141,7 @@ public:
 	}
 
 	Vec3d orientationNormal() {
-		return orientation_vec;
+		return orientation_vec_up;
 	}
 
 	bool enableLog(string ofile) {
@@ -206,13 +224,15 @@ void PhysicsObject::update(double delta, PhysicsSim &sim) {
 
 	// Update axis-angle/vector representation
 	set(orientation_aa, orientation);
-	orientation_vec.set(0,0,1);
-	xform(orientation_vec, orientation, orientation_vec);
+	orientation_vec_up.set(0,0,1);
+	xform(orientation_vec_up, orientation, orientation_vec_up);
+	orientation_vec_forward.set(1,0,0);
+	xform(orientation_vec_forward, orientation, orientation_vec_forward);
 
 	// Log physics state
 	if(enablelog) {
 		//outfile << time << "\t" << position << "\t" << velocity << "\t" << orientation_aa << "\t" << rotation << force << torque << endl;
-		outfile << time << "\t" << position.mData[0] << "\t" << position.mData[1] << "\t" << position.mData[2] << "\t" << orientation_vec.mData[0] << "\t" << orientation_vec.mData[1] << "\t" << orientation_vec.mData[2] << endl;
+		outfile << time << "\t" << position.mData[0] << "\t" << position.mData[1] << "\t" << position.mData[2] << "\t" << orientation_vec_up.mData[0] << "\t" << orientation_vec_up.mData[1] << "\t" << orientation_vec_up.mData[2] << "\t" << orientation_vec_forward.mData[0] << "\t" << orientation_vec_forward.mData[1] << "\t" << orientation_vec_forward.mData[2] << endl;
 	}
 	time += delta;	// Update total time elapsed
 

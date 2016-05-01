@@ -5,14 +5,14 @@
 #include "PWM.h"
 #include "I2C.h"
 #include "Processor.h"
-#include "HardwareAccel.h"
+#include "flightcontrol/FlightController.h"
 #include "physics/Physics.h"
 #include "physics/PhysicsModules.h"
 #include "physics/PhysicsForces.h"
 
 using namespace gmtl;
 
-#define PHYSICS_SIM_TIME 20
+#define PHYSICS_SIM_TIME 30
 #define PHYSICS_STEP_MS 1
 
 // DJI Phantom 3/4 with 2312 motors (960kv) and 9.4x4.5 props
@@ -33,7 +33,7 @@ using namespace gmtl;
 class Top : public sc_module
 {
 public:
-	HardwareAccel* hardware;
+	FlightController* hardware;
 	Processor* proc;
 
 	PhysicsSim* phys;
@@ -47,7 +47,7 @@ public:
 	PWM_bus* pwm_bus_2;
 	PWM_bus* pwm_bus_3;
 	PWM_bus* pwm_bus_4;
-	iic_bus* i2c_bus;
+	i2c_bus* iic_bus;
 
 	LSM6DS3* sensor_acc_gyro;
 	LIS3MDL* sensor_mag;
@@ -57,7 +57,7 @@ public:
 	Top(sc_module_name name) : sc_module(name)
 	{
 		// Bus
-		i2c_bus = new iic_bus("I2C_BUS", I2C_CLK_FREQ);
+		iic_bus = new i2c_bus("I2C_BUS", I2C_CLK_FREQ);
 		pwm_bus_1 = new PWM_bus("PWM_BUS_1", PWM_CLK_FREQ);
 		pwm_bus_2 = new PWM_bus("PWM_BUS_2", PWM_CLK_FREQ);
 		pwm_bus_3 = new PWM_bus("PWM_BUS_3", PWM_CLK_FREQ);
@@ -65,6 +65,16 @@ public:
 
 		// Processor Module
 		proc = new Processor("PROCESSOR");
+
+		// Sensors
+		sensor_acc_gyro = new LSM6DS3("SENSOR_ACC_GYRO");
+		sensor_acc_gyro->i2c_slv(*iic_bus);
+		sensor_mag = new LIS3MDL("SENSOR_MAG");
+		sensor_mag->i2c_slv(*iic_bus);
+		sensor_baro = new LPS22HB("SENSOR_BARO");
+		sensor_baro->i2c_slv(*iic_bus);
+		sensor_gps = new A2235H("SENSOR_GPS");
+		sensor_gps->i2c_slv(*iic_bus);
 
 		// UAV Physics Model
 		uav = new PhysicsObject(UAV_MASS, UAV_LENGTH, UAV_WIDTH, UAV_HEIGHT);
@@ -84,28 +94,22 @@ public:
 		uav->addComponent(aeromodel);
 		uav->enableLog("uav_physics_log.txt");
 		uav->position.set(0,0,1);
-
-		// Sensors
-		sensor_acc_gyro = new LSM6DS3("SENSOR_ACC_GYRO");
-		sensor_acc_gyro->i2c_slv(*i2c_bus);
-		sensor_mag = new LIS3MDL("SENSOR_MAG");
-		sensor_mag->i2c_slv(*i2c_bus);
-		sensor_baro = new LPS22HB("SENSOR_BARO");
-		sensor_baro->i2c_slv(*i2c_bus);
-		sensor_gps = new A2235H("SENSOR_GPS");
-		sensor_gps->i2c_slv(*i2c_bus);
-
-		// Hardware Accelerator
-		hardware = new HardwareAccel("HARDWARE_ACCEL");
-		hardware->i2c_mst(*i2c_bus);
-		hardware->pwm_out_1(*pwm_bus_1);
-		hardware->pwm_out_2(*pwm_bus_2);
-		hardware->pwm_out_3(*pwm_bus_3);
-		hardware->pwm_out_4(*pwm_bus_4);
+		uav->addComponent(sensor_baro);
+		uav->addComponent(sensor_acc_gyro);
+		uav->addComponent(sensor_mag);
 
 		// Physics Sim
 		phys = new PhysicsSim("PHYSICS_SIM", PHYSICS_STEP_MS, PHYSICS_SIM_TIME);
 		phys->addObject(uav);
+
+
+		// Hardware Accelerator
+		hardware = new FlightController("FLIGHT_CONTROL", phys, uav);
+		hardware->i2c_mst(*iic_bus);
+		hardware->pwm_out_1(*pwm_bus_1);
+		hardware->pwm_out_2(*pwm_bus_2);
+		hardware->pwm_out_3(*pwm_bus_3);
+		hardware->pwm_out_4(*pwm_bus_4);
 	}
 };
 

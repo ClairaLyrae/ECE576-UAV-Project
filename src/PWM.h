@@ -29,26 +29,26 @@ public:
 	sc_event duty_write_event;
 	sc_event duty_change_event;
 
-	SC_HAS_PROCESS(PWM_bus);
+	//SC_HAS_PROCESS(PWM_bus);
 
 	PWM_bus(sc_module_name name, double freq) : sc_module(name) {
-		SC_THREAD(main);
+		//SC_THREAD(main);
 		this->duty = 0;
 		this->duty_new = 0;
 		this->period_ns = 1000000000.0/freq;
 	}
 
-	void main() {
-		while(true) {
-			wait(duty_write_event);
-			wait(period_ns, SC_NS);
-			duty = duty_new;
-			duty_change_event.notify();
-		}
-	}
+//	void main() {
+//		while(true) {
+//			wait(duty_write_event);
+//			wait(period_ns, SC_NS);
+//			duty = duty_new;
+//			duty_change_event.notify();
+//		}
+//	}
 
 	void writePWM(double dc) {
-		duty_new = dc;
+		duty = dc;
 		duty_write_event.notify();
 	}
 
@@ -57,7 +57,7 @@ public:
 	}
 
 	double listenPWM() {
-		wait(duty_change_event);
+		wait(duty_write_event);
 		return duty;
 	}
 };
