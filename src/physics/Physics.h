@@ -16,6 +16,14 @@ using namespace std;
 #define STP_TEMP 288.15				// K
 #define STP_PRESSURE 101325			// Pa
 
+#define M_PI 3.14159265359
+#define XAXIS 0
+#define YAXIS 1
+#define ZAXIS 2
+#define ROLL 0
+#define PITCH 1
+#define YAW 2
+
 class PhysicsObject;
 class PhysicsComponent;
 
@@ -99,21 +107,32 @@ private:
 	string outfilename;
 	bool enablelog;
 	double time;
+
+	// Utility components
 	Vec3d orientation_vec_up;
 	Vec3d orientation_vec_forward;
 	AxisAngled orientation_aa;
 	AxisAngled rotation_aa;
 	Quatd rotation_q;
 public:
+	// Translation Components
 	Point3d position;
 	Vec3d velocity;
 	Vec3d acceleration;
+
+	// Rotation components
 	Quatd orientation;
 	Vec3d rotation;
 	Vec3d angularAcceleration;
+
+	// Attitude components
+	Vec3d attitude;
+	Vec3d attitude_rate;
+
 	double dimensions[3];
 	double mass;
 
+	// Force components
 	Vec3d force;
 	Vec3d torque;
 
@@ -171,6 +190,28 @@ public:
 	~PhysicsObject() {
 		disableLog();
 	}
+
+	Vec3d &toAttitude(Vec3d &result, Quatd &q)
+	{
+	    double q0q0 = q[0]*q[0];
+	    double q0q1 = q[0]*q[1];
+	    double q0q2 = q[0]*q[2];
+	    double q0q3 = q[0]*q[3];
+	    double q1q1 = q[1]*q[1];
+	    double q1q2 = q[1]*q[2];
+	    double q1q3 = q[1]*q[3];
+	    double q2q2 = q[2]*q[2];
+	    double q2q3 = q[2]*q[3];
+	    double q3q3 = q[3]*q[3];
+
+//	    result[ROLL] = atan2(2*(q0q1 + q2q3), q0q0 - q1q1 - q2q2 + q3q3);
+//	    result[PITCH] = -asin(2*(q1q3 - q0q2));
+//	    result[YAW] = atan2(2*(q1q2 + q0q3), q0q0 + q1q1 - q2q2 - q3q3);
+		result[YAW] = atan2(2*(q0q1 + q2q3), q0q0 - q1q1 - q2q2 + q3q3);
+		result[PITCH] = -asin(2*(q1q3 - q0q2));
+		result[ROLL] = atan2(2*(q1q2 + q0q3), q0q0 + q1q1 - q2q2 - q3q3);
+	    return result;
+	}
 };
 
 // Physics Component
@@ -179,7 +220,9 @@ class PhysicsComponent
 public:
     virtual ~PhysicsComponent() {};
 	virtual void update(double delta, PhysicsSim &sim, PhysicsObject &parent) {};
+
 };
+
 
 void PhysicsSim::main() {
 	while(sim_time == 0 || time < sim_time) {
@@ -190,8 +233,11 @@ void PhysicsSim::main() {
 		time += delta_ms*0.001;
 		event_sim_delta.notify();
 	}
+	cout << "Physics simulation end (t=" << time << "s)" << endl;
+	sc_stop();
 	return;
 }
+
 
 void PhysicsObject::update(double delta, PhysicsSim &sim) {
 	// Reset forces for this physics step
@@ -222,17 +268,25 @@ void PhysicsObject::update(double delta, PhysicsSim &sim) {
 	slerp(orientation, delta, orientation, orientation*rotation_q, false);
 	normalize(orientation);
 
-	// Update axis-angle/vector representation
+	// Update miscellanious representations
 	set(orientation_aa, orientation);
 	orientation_vec_up.set(0,0,1);
 	xform(orientation_vec_up, orientation, orientation_vec_up);
 	orientation_vec_forward.set(1,0,0);
 	xform(orientation_vec_forward, orientation, orientation_vec_forward);
+	toAttitude(attitude, orientation);
+	toAttitude(attitude_rate, rotation_q);
 
 	// Log physics state
 	if(enablelog) {
-		//outfile << time << "\t" << position << "\t" << velocity << "\t" << orientation_aa << "\t" << rotation << force << torque << endl;
-		outfile << time << "\t" << position.mData[0] << "\t" << position.mData[1] << "\t" << position.mData[2] << "\t" << orientation_vec_up.mData[0] << "\t" << orientation_vec_up.mData[1] << "\t" << orientation_vec_up.mData[2] << "\t" << orientation_vec_forward.mData[0] << "\t" << orientation_vec_forward.mData[1] << "\t" << orientation_vec_forward.mData[2] << endl;
+		//outfile << time << "\t" << position << "\t" << orientation << "\t" << attitude << "\t" << attitude_rate << endl;
+		outfile << time << "\t";
+		outfile << position[XAXIS] << "\t" << position[YAXIS] << "\t" << position[ZAXIS] << "\t";
+		outfile << orientation_vec_up[XAXIS] << "\t" << orientation_vec_up[YAXIS] << "\t" << orientation_vec_up[ZAXIS] << "\t";
+		outfile << orientation_vec_forward[XAXIS] << "\t" << orientation_vec_forward[YAXIS] << "\t" << orientation_vec_forward[ZAXIS] << "\t";
+		outfile << attitude[ROLL] << "\t" << attitude[PITCH] << "\t" << attitude[YAW] << "\t";
+		outfile << attitude_rate[ROLL] << "\t" << attitude_rate[PITCH] << "\t" << attitude_rate[YAW] << "\t";
+		outfile << endl;
 	}
 	time += delta;	// Update total time elapsed
 

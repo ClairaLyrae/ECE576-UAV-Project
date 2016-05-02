@@ -68,7 +68,7 @@ public:
 	    float magX, magY;
 	    float initialHdg, cosHeading, sinHeading;
 
-	    float gx, gy, gz, ax, ay, az, mx, my, mz;
+	    float ax, ay, az, mx, my, mz;
 	    ax = s.accel[XAXIS];
 	    ay = s.accel[YAXIS];
 	    az = s.accel[ZAXIS];

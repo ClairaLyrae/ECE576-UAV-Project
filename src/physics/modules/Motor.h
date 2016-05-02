@@ -42,7 +42,10 @@ public:
 	void main() {
 		while(true) {
 			thrustLevel = pwm_in->listenPWM();
-			cout << "Received thrust value of " << thrustLevel << endl;
+			if(thrustLevel > 1.0)
+				thrustLevel = 1.0;
+			else if(thrustLevel < 0.0)
+				thrustLevel = 0.0;
 		}
 	}
 

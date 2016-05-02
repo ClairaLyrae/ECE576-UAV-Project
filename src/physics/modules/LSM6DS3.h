@@ -92,9 +92,9 @@ public:
 		acc_x = (long)(parent.acceleration.mData[0]*ACC_SCALE_FACTOR);
 		acc_y = (long)(parent.acceleration.mData[1]*ACC_SCALE_FACTOR);
 		acc_z = (long)(parent.acceleration.mData[2]*ACC_SCALE_FACTOR);
-		gyro_x = (long)(parent.rotation.mData[0]*GYRO_SCALE_FACTOR);
-		gyro_y = (long)(parent.rotation.mData[2]*GYRO_SCALE_FACTOR);
-		gyro_z = (long)(parent.rotation.mData[3]*GYRO_SCALE_FACTOR);
+		gyro_x = (long)(parent.attitude_rate[ROLL]*GYRO_SCALE_FACTOR);
+		gyro_y = (long)(parent.attitude_rate[PITCH]*GYRO_SCALE_FACTOR);
+		gyro_z = (long)(parent.attitude_rate[YAW]*GYRO_SCALE_FACTOR);
 
 		// Calculated values for register
 		registers[REG_ACC_X_L] = (acc_x) & 0xFF;
