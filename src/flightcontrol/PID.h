@@ -31,7 +31,7 @@ public:
 	    double pidLimited;
 
 	    dTerm = ((error*D) - filterState) * 100.0f;
-	    pidSum = (error*P) + integratorState + dTerm;
+	    pidSum = ((error*P) + integratorState) + dTerm;
 
 	    if (pidSum > Limit) {
 	        pidLimited = Limit;

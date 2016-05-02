@@ -10,6 +10,7 @@
 #include "../physics/PhysicsModules.h"
 #include "SensorData.h"
 #include "gmtl/gmtl.h"
+#include <stdint.h>
 
 #define I2C_WRITE false
 #define I2C_READ true
@@ -76,7 +77,6 @@ public:
 	double motor[4];
 
 	// Sensor data
-	Sensors sensor_raw;
 	Sensors sensor;
 
 	// Calculated IMU Data
@@ -130,12 +130,12 @@ public:
 		velPID[XAXIS].initialize(20, 20, 0, 20, 0, 0);
 		velPID[YAXIS].initialize(20, 20, 0, 20, 0, 0);
 		velPID[ZAXIS].initialize(20, 20, 0, 20, 0, 0);
-		attPID[ROLL].initialize(3, 2, 0, M_PI_2, 0, 0);
-		attPID[PITCH].initialize(3, 2, 0, M_PI_2, 0, 0);
-		attPID[YAW].initialize(3, 2, 0, M_PI_2, 0, 0);
-		ratePID[ROLL].initialize(5, 1, 0, 1, 0, 0);
-		ratePID[PITCH].initialize(5, 1, 0, 1, 0, 0);
-		ratePID[YAW].initialize(5, 1, 0, 1, 0, 0);
+		attPID[ROLL].initialize(6, 1.8, 10, M_PI_2, 0, 0);
+		attPID[PITCH].initialize(6, 1.8, 10, M_PI_2, 0, 0);
+		attPID[YAW].initialize(6, 1.8, 10, M_PI_2, 0, 0);
+		ratePID[ROLL].initialize(7, 1, 0, 1, 0, 0);
+		ratePID[PITCH].initialize(7, 1, 0, 1, 0, 0);
+		ratePID[YAW].initialize(7, 1, 0, 1, 0, 0);
 		enablePID = false;
 		enablelog = false;
 	}
@@ -241,8 +241,13 @@ void FlightController::mainTimer() {
 		updateCycle++;
 		if(updateCycle >= 1000)
 			updateCycle = 0;
-		if(I2C_mag_update || I2C_acc_gyro_update || I2C_baro_update)
+		if(I2C_mag_update || I2C_acc_gyro_update || I2C_baro_update) {
 			cout << "[" << sc_time_stamp() << "] I2C Bus error: unserviced request" << endl;
+			sc_stop();
+		}
+		I2C_baro_update = (updateCycle%100 == 0) ? true : false;
+		I2C_acc_gyro_update = (updateCycle%1 == 0) ? true : false;
+		I2C_mag_update = (updateCycle%10 == 0) ? true : false;
 		if(I2C_mag_update || I2C_acc_gyro_update || I2C_baro_update)
 			timerInterrupt.notify();
 	}
@@ -254,30 +259,34 @@ void FlightController::mainTimer() {
 // Uses ISF model with interrupt flags.
 void FlightController::mainI2C() {
 	unsigned i;
-	unsigned buffer[16];
+	uint8_t buffer[16];
+	uint32_t raw;
 	while(true) {
 		wait(timerInterrupt);
 
 		// Read Accel/Gyro
 		if(I2C_acc_gyro_update) {
 			i2c_mst->i2c_read(LSM6DS3::I2C_ADDRESS, LSM6DS3::REG_GYRO_X_L, 12, buffer);
-			cout << "Read from accel: " << sensor_raw.accel[0] << ", " << sensor_raw.accel[1] << ", " << sensor_raw.accel[2] << endl;
 			for (i = 0; i < 3; i++) {
-				sensor_raw.gyro[i] = (buffer[2*i + 1] << 8) + buffer[2*i];
-				sensor_raw.accel[i] = (buffer[6 + (2*i + 1)] << 8) + buffer[6 + 2*i];
-				sensor.accel[i] = sensor_raw.accel[i]/(LSM6DS3::ACC_SCALE_FACTOR) + ACCEL_SCALE_BIAS;
-				sensor.gyro[i] = sensor_raw.gyro[i]/(LSM6DS3::GYRO_SCALE_FACTOR) + GYRO_SCALE_BIAS;
+				raw = ((buffer[2*i + 1] << 8) + buffer[2*i]);
+				//cout << "Gyro raw = [" << raw << "]" << endl;
+				sensor.gyro[i] = (((int16_t)raw)/(LSM6DS3::GYRO_SCALE_FACTOR) + GYRO_SCALE_BIAS)*(M_PI/180);
+
+				raw = ((buffer[6 + (2*i + 1)] << 8) + buffer[6 + 2*i]);
+				//cout << "Acc raw = [" << raw << "]" << endl;
+				sensor.accel[i] = ((int16_t)raw)/(LSM6DS3::ACC_SCALE_FACTOR) + ACCEL_SCALE_BIAS;
 			}
+			//cout << "Gyro = [" << attitude_rate << ", (" << sensor.gyro[ROLL] << ", " << sensor.gyro[PITCH] << ", " << sensor.gyro[YAW] << ")]" << endl;
+			//cout << "Acc = [" << acc << ", (" << sensor.accel[XAXIS] << ", " << sensor.accel[YAXIS] << ", " << sensor.accel[ZAXIS] << ")]" << endl;
 			I2C_acc_gyro_update = false;
 		}
 
 		// Read mag
 		if(I2C_mag_update) {
 			i2c_mst->i2c_read(LIS3MDL::I2C_ADDRESS, LIS3MDL::REG_MAG_X_L, 6, buffer);
-			cout << "Read from mag: " << sensor_raw.mag[0] << ", " << sensor_raw.mag[1] << ", " << sensor_raw.mag[2] << endl;
 			for (i = 0; i < 3; i++) {
-				sensor_raw.mag[i] = (buffer[2*i + 1] << 8) + buffer[2*i];
-				sensor.mag[i] = sensor_raw.mag[i]/(LIS3MDL::MAG_SCALE_FACTOR) + MAG_SCALE_BIAS;
+				raw = (buffer[2*i + 1] << 8) + buffer[2*i];
+				sensor.mag[i] = raw/(LIS3MDL::MAG_SCALE_FACTOR) + MAG_SCALE_BIAS;
 			}
 			I2C_mag_update = false;
 		}
@@ -285,12 +294,10 @@ void FlightController::mainI2C() {
 		// Read temperature and pressure from barometer (100Hz), use first order filtering
 		if(I2C_baro_update) {
 			i2c_mst->i2c_read(LPS22HB::I2C_ADDRESS, LPS22HB::REG_PRES_XL, 5, buffer);
-			cout << "Read from baro: " << sensor_raw.pressure << ", " << sensor_raw.temp << endl;
-			cout << "Read from baro (buffer): " << buffer[0] << ", " << buffer[1] << ", " << buffer[2] << ", " << buffer[3] << ", " << buffer[4] << endl;
-			sensor_raw.pressure = (buffer[2] << 16) + (buffer[1] << 8) + buffer[0];
-			sensor_raw.temp = (buffer[4] << 8) + buffer[3];
-			sensor.pressure = sensor_raw.pressure/(LPS22HB::PRESS_SCALE_FACTOR) + PRESSURE_SCALE_BIAS;
-			sensor.temp = sensor_raw.temp/(LPS22HB::TEMP_SCALE_FACTOR) + TEMP_SCALE_BIAS;
+			raw = (buffer[2] << 16) + (buffer[1] << 8) + buffer[0];
+			sensor.pressure = raw/(LPS22HB::PRESS_SCALE_FACTOR) + PRESSURE_SCALE_BIAS;
+			raw = (buffer[4] << 8) + buffer[3];
+			sensor.temp = raw/(LPS22HB::TEMP_SCALE_FACTOR) + TEMP_SCALE_BIAS;
 			baro_altitude = (STP_TEMP/TEMP_LAPSE_RATE) * (1.0f - pow(sensor.pressure / STP_PRESSURE, (GAS_CONSTANT*TEMP_LAPSE_RATE)/(EARTH_GRAVITY*AIR_MOLAR_MASS)));
 			I2C_baro_update = false;
 		}
@@ -303,17 +310,24 @@ void FlightController::mainIMU() {
 	double error;
 	double throttleCmd;
 	double tempAttCompensationPitch, tempAttCompensationRoll;
+	unsigned i;
+	double maxMotor;
+
+	// 1000 Hz
 	double dt = 0.001; // Delta time cycle for this update
 	while(true) {
-		// 1000 Hz
-		wait(1, SC_MS);
+		// Read sensors
+		//attitude_rate = uav->attitude_rate;
+		//acc = uav->acceleration;
+		attitude_rate.set(sensor.gyro[ROLL], sensor.gyro[PITCH], sensor.gyro[YAW]);
+		acc.set(sensor.accel[XAXIS], sensor.accel[YAXIS], sensor.accel[ZAXIS]);
 
-		// TODO Do AHRS calculations to find the following:
-		attitude = uav->attitude;
-		attitude_rate = uav->attitude_rate;
-		acc = uav->acceleration;
-		vel = uav->velocity;
-		pos = uav->position;
+		// AHRS
+		attitude[ROLL] += wrapRadians(attitude_rate[ROLL]*dt);
+		attitude[PITCH] += wrapRadians(attitude_rate[PITCH]*dt);
+		attitude[YAW] += wrapRadians(attitude_rate[YAW]*dt);
+		vel += acc*dt;
+		pos += vel*dt;
 
 		// Apply PID Controllers
 		if(enablePID) {
@@ -379,13 +393,25 @@ void FlightController::mainIMU() {
 			motor[3] += ratePID[YAW].state;
 		#endif
 
+		    maxMotor = motor[0];
+		    for (i = 0; i < 4; i++) {
+		        if (motor[i] > maxMotor)
+		            maxMotor = motor[i];
+		    }
+		    // If a motor is run beyond its max speed, scale motors to it
+	        if (maxMotor > 1) {
+				for (i = 0; i < 4; i++) {
+					motor[i] = motor[i]/maxMotor;
+				}
+	        }
+
 			// Motor log file output
 			if(enablelog) {
 				outfile << sc_time_stamp() << motor[0] << "\t" << motor [1] << "\t" << motor [2] << "\t" << motor [3] << endl;
 			}
 		}
+		wait(1, SC_MS);
 	}
 }
-
 
 #endif

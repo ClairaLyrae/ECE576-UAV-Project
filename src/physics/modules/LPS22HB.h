@@ -4,13 +4,14 @@
 #include <systemc.h>
 #include "../Physics.h"
 #include "../../I2C.h"
+#include <stdint.h>
 
 class LPS22HB : public PhysicsComponent, public sc_module
 {
 private:
-	long pressure;
-	long temperature;
-	unsigned registers[128];
+	uint32_t pressure;
+	uint16_t temperature;
+	uint8_t registers[128];
 public:
 	static const unsigned I2C_ADDRESS = 46;
 	static const unsigned REG_PRES_XL = 0x28;
@@ -34,22 +35,21 @@ public:
 	SC_HAS_PROCESS(LPS22HB);
 
 	LPS22HB(sc_module_name name) : sc_module(name) {
-		//SC_THREAD(main);
+		SC_THREAD(main);
 		//SC_THREAD(tick);
 	}
 
 	void tick() {
 		while(true) {
-			wait(1000, SC_MS);
+			wait(100, SC_MS);
 			cout << sc_time_stamp() << ":\tLPS22HB Pressure = " << pressure << " (" << registers[REG_PRES_XL] << ", " << registers[REG_PRES_L] << ", " << registers[REG_PRES_H] << ")" << endl;
 			cout << sc_time_stamp() << ":\tLPS22HB Temp = " << temperature << " (" << registers[REG_TEMP_L] << ", " << registers[REG_TEMP_H] << ")" << endl;
 		}
 	}
 
 	void main() {
-
 		// Respond to I2C bus
-		unsigned req_addr, reg_loc, i;
+		uint8_t req_addr, reg_loc, i;
 		bool stop, req_rw;
 		while(true) {
 			i = 0;

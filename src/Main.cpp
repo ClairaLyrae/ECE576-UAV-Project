@@ -12,7 +12,7 @@
 
 using namespace gmtl;
 
-#define PHYSICS_SIM_TIME 50
+#define PHYSICS_SIM_TIME 20
 #define PHYSICS_STEP_MS 1
 
 // DJI Phantom 3/4 with 2312 motors (960kv) and 9.4x4.5 props

@@ -4,12 +4,13 @@
 #include <systemc.h>
 #include "../Physics.h"
 #include "../../I2C.h"
+#include <stdint.h>
 
 class LIS3MDL : public PhysicsComponent, public sc_module
 {
 private:
-	long mag[3];
-	unsigned registers[128];
+	uint16_t mag[3];
+	uint8_t registers[128];
 public:
 	static const unsigned I2C_ADDRESS = 54;
 	static const unsigned REG_MAG_X_L = 0x28;
@@ -29,7 +30,7 @@ public:
 	SC_HAS_PROCESS(LIS3MDL);
 
 	LIS3MDL(sc_module_name name) : sc_module(name) {
-		//SC_THREAD(main);
+		SC_THREAD(main);
 		//SC_THREAD(tick);
 	}
 
@@ -42,7 +43,7 @@ public:
 
 	void main() {
 		// Respond to I2C bus
-		unsigned req_addr, reg_loc, i;
+		uint8_t req_addr, reg_loc, i;
 		bool stop, req_rw;
 		while(true) {
 			i = 0;

@@ -4,6 +4,7 @@
 #include <systemc.h>
 #include "../Physics.h"
 #include "../../I2C.h"
+#include <stdint.h>
 
 class A2235H : public PhysicsComponent, public sc_module
 {

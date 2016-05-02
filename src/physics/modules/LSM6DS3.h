@@ -4,13 +4,14 @@
 #include <systemc.h>
 #include "../Physics.h"
 #include "../../I2C.h"
+#include <stdint.h>
 
 class LSM6DS3 : public PhysicsComponent, public sc_module
 {
 private:
-	long acc_x, acc_y, acc_z;
-	long gyro_x, gyro_y, gyro_z;
-	unsigned registers[128];
+	uint16_t acc_x, acc_y, acc_z;
+	uint16_t gyro_x, gyro_y, gyro_z;
+	uint8_t registers[128];
 public:
 	static const unsigned I2C_ADDRESS = 53;
 	static const unsigned REG_GYRO_X_L = 0x22;
@@ -43,7 +44,7 @@ public:
 	SC_HAS_PROCESS(LSM6DS3);
 
 	LSM6DS3(sc_module_name name) : sc_module(name) {
-		//SC_THREAD(main);
+		SC_THREAD(main);
 		//SC_THREAD(tick);
 	}
 
@@ -57,7 +58,7 @@ public:
 
 	void main() {
 		// Respond to I2C bus
-		unsigned req_addr, reg_loc, i;
+		uint8_t req_addr, reg_loc, i;
 		bool stop, req_rw;
 		while(true) {
 			i = 0;
@@ -89,12 +90,12 @@ public:
 	}
 
 	void update(double delta, PhysicsSim &sim, PhysicsObject &parent) {
-		acc_x = (long)(parent.acceleration.mData[0]*ACC_SCALE_FACTOR);
-		acc_y = (long)(parent.acceleration.mData[1]*ACC_SCALE_FACTOR);
-		acc_z = (long)(parent.acceleration.mData[2]*ACC_SCALE_FACTOR);
-		gyro_x = (long)(parent.attitude_rate[ROLL]*GYRO_SCALE_FACTOR);
-		gyro_y = (long)(parent.attitude_rate[PITCH]*GYRO_SCALE_FACTOR);
-		gyro_z = (long)(parent.attitude_rate[YAW]*GYRO_SCALE_FACTOR);
+		acc_x = (unsigned long)(parent.acceleration.mData[0]*ACC_SCALE_FACTOR);
+		acc_y = (unsigned long)(parent.acceleration.mData[1]*ACC_SCALE_FACTOR);
+		acc_z = (unsigned long)(parent.acceleration.mData[2]*ACC_SCALE_FACTOR);
+		gyro_x = (unsigned long)(parent.attitude_rate[ROLL]*(180/M_PI)*GYRO_SCALE_FACTOR);
+		gyro_y = (unsigned long)(parent.attitude_rate[PITCH]*(180/M_PI)*GYRO_SCALE_FACTOR);
+		gyro_z = (unsigned long)(parent.attitude_rate[YAW]*(180/M_PI)*GYRO_SCALE_FACTOR);
 
 		// Calculated values for register
 		registers[REG_ACC_X_L] = (acc_x) & 0xFF;
