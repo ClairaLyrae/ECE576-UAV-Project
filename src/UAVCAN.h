@@ -15,10 +15,10 @@ Transfer ID 5 bits.
 class uav_can_if : virtual public sc_interface
 {
 public:
-	virtual unsigned char can_listen(unsigned short &msgID, unsigned long long &payload, unsigned char &transferID, unsigned char &sourceID) = 0;
+	virtual unsigned char can_listen(unsigned short &msgID, unsigned char &payload[], unsigned char &paylength, unsigned char &transferID, unsigned char &sourceID) = 0;
 	virtual bool can_transmit(unsigned char priority) = 0;
-	virtual bool can_message(unsigned short msgID, unsigned long long payload, unsigned char paylength, unsigned char transferID, unsigned char sourceID) = 0;
-	virtual bool can_service(unsigned short msgID, unsigned long long payload, unsigned char paylength, unsigned char transferID, unsigned char sourceID, unsigned char destinationID) = 0;
+	virtual bool can_message(unsigned short msgID, unsigned char payload[], unsigned char paylength, unsigned char transferID, unsigned char sourceID) = 0;
+	virtual bool can_service(unsigned short msgID, unsigned char payload[], unsigned char paylength, unsigned char transferID, unsigned char sourceID, unsigned char destinationID) = 0;
 };
 
 class uav_can_bus : public sc_module, public uav_can_if
@@ -27,7 +27,8 @@ private:
 	bool idle, sof, ack, interframe;
 	unsigned char priorityHigh, byteCount, tailbyte, sourceNode, destinationNode;
 	unsigned short dataType;
-	unsigned long long contents;
+	unsigned char contents[7];
+	unsigned i;
 
 public:
 	SC_HAS_PROCESS(uav_can_bus);
@@ -37,13 +38,17 @@ public:
 		SC_THREAD(arbiter);
 	}
 
-	unsigned char can_listen(unsigned short &msgID, unsigned long long &payload, unsigned char &transferID, unsigned char &sourceID)
+	unsigned char can_listen(unsigned short &msgID, unsigned char &payload[], unsigned char &paylength, unsigned char &transferID, unsigned char &sourceID)
 	{
 		wait(frameReady);
 		msgID = dataType;
-		payload = contents;
+		for(i = 0; i < byteCount; i++)
+		{
+			payload[i] = contents[i];
+		}
 		transferID = tailbyte;
 		sourceID = sourceNode;
+		paylength = byteCount;
 		ack = true;
 		wait(canRelease);
 		return destinationNode; //return 0 if broadcast
@@ -78,22 +83,29 @@ public:
 		}
 	}
 
-	bool can_message(unsigned short msgID, unsigned long long payload, unsigned char paylength, unsigned char transferID, unsigned char sourceID)
+	bool can_message(unsigned short msgID, unsigned char payload[], unsigned char paylength, unsigned char transferID, unsigned char sourceID)
 	{
 		dataType = msgID;
-		contents = payload;
+		for(i = 0; i < paylength; i++)
+		{
+			contents[i] = payload[i];
+		}
 		byteCount = paylength;
 		tailbyte = transferID;
 		sourceNode = sourceID;
+		destinationNode = 0;
 		frameLoaded.notify();
 		wait(canRelease);
 		return ack;
 	}
 
-	bool can_service(unsigned short msgID, unsigned long long payload, unsigned char paylength, unsigned char transferID, unsigned char sourceID, unsigned char destinationID)
+	bool can_service(unsigned short msgID, unsigned char payload[], unsigned char paylength, unsigned char transferID, unsigned char sourceID, unsigned char destinationID)
 	{
 		dataType = msgID;
-		contents = payload;
+		for(i = 0; i < paylength; i++)
+		{
+			contents[i] = payload[i];
+		}
 		byteCount = paylength;
 		tailbyte = transferID;
 		sourceNode = sourceID;
@@ -107,7 +119,6 @@ public:
 	{
 		while(1)
 		{
-			destinationNode = 0;
 			priorityHigh = 32;
 			sof = false;
 			ack = false;
@@ -121,11 +132,11 @@ public:
 			wait(34*CAN_SPEED,SC_NS);
 			priorityCheck.notify();
 			wait(frameLoaded);
-			wait(28*CAN_SPEED,SC_NS);
+			wait(27*CAN_SPEED,SC_NS);
 			wait(byteCount*8*CAN_SPEED,SC_NS);
+			wait(((61+byteCount*8)/5)*CAN_SPEED,SC_NS); //stuffing estimation
 			frameReady.notify();
-			wait(((62+byteCount*8)/5)*CAN_SPEED,SC_NS); //stuffing estimation
-			wait(9*CAN_SPEED,SC_NS);
+			wait(10*CAN_SPEED,SC_NS);
 			interframe = true;
 			canRelease.notify();
 			wait(3*CAN_SPEED,SC_NS);
