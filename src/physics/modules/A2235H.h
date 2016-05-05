@@ -13,7 +13,7 @@ private:
 	unsigned registers[128];
 public:
 	static const unsigned char CAN_NODE = 3;
-	static const unsigned char COORD_PRI = 1;//change me!
+	static const unsigned char COORD_PRI = 10;//change me!
 	float longitude, latitude, heading, altitude, velocity;
 
 	sc_port<uav_can_if> canif;
@@ -28,7 +28,7 @@ public:
 
 	void main() {
 		unsigned char broadcastCount;
-		unsigned char transfer, source, target, length, priority;
+		unsigned char transfer, source, length;
 		unsigned short msgType;
 		uint8_t message[7];
 		uint32_t temp;
@@ -38,7 +38,7 @@ public:
 			wait(100,SC_MS);
 			while(!canif->can_transmit(COORD_PRI))
 			{
-				target = canif->can_listen(msgType, message, length, transfer, source);
+				canif->can_listen(msgType, message, length, transfer, source);
 			}
 			// broadcast lat
 			temp = *((uint32_t*)&latitude);
@@ -49,7 +49,7 @@ public:
 			canif->can_message(20002,message,4,broadcastCount,CAN_NODE);
 			while(!canif->can_transmit(COORD_PRI))
 			{
-				target = canif->can_listen(msgType, message, length, transfer, source);
+				canif->can_listen(msgType, message, length, transfer, source);
 			}
 			// broadcast long
 			temp = *((uint32_t*)&longitude);
@@ -60,7 +60,7 @@ public:
 			canif->can_message(20003,message,4,broadcastCount,CAN_NODE);
 			while(!canif->can_transmit(COORD_PRI))
 			{
-				target = canif->can_listen(msgType, message, length, transfer, source);
+				canif->can_listen(msgType, message, length, transfer, source);
 			}
 			// broadcast rest
 			half = floatToHalf(heading);
