@@ -45,14 +45,14 @@ public:
 		}
 		message[0] = 0;
 		half = floatToHalf(0);
-		message[1] = half & 0x0F;
-		message[2] = (half >> 8) & 0x0F;
+		message[1] = half & 0xFF;
+		message[2] = (half >> 8) & 0xFF;
 		half = floatToHalf(0);
-		message[3] = half & 0x0F;
-		message[4] = (half >> 8) & 0x0F;
+		message[3] = half & 0xFF;
+		message[4] = (half >> 8) & 0xFF;
 		half = floatToHalf(15);
-		message[5] = half & 0x0F;
-		message[6] = (half >> 8) & 0x0F;
+		message[5] = half & 0xFF;
+		message[6] = (half >> 8) & 0xFF;
 		cout << (int)message[0] << " " << (int)message[5] << " " << (int)message[6] << endl;
 		canif->can_message(20001, message, 7, 0, CAN_NODE);
 
@@ -62,14 +62,14 @@ public:
 		}
 		message[0] = 35;
 		half = floatToHalf(0);
-		message[1] = half & 0x0F;
-		message[2] = (half >> 8) & 0x0F;
+		message[1] = half & 0xFF;
+		message[2] = (half >> 8) & 0xFF;
 		half = floatToHalf(0);
-		message[3] = half & 0x0F;
-		message[4] = (half >> 8) & 0x0F;
+		message[3] = half & 0xFF;
+		message[4] = (half >> 8) & 0xFF;
 		half = floatToHalf(45*M_PI/180);
-		message[5] = half & 0x0F;
-		message[6] = (half >> 8) & 0x0F;
+		message[5] = half & 0xFF;
+		message[6] = (half >> 8) & 0xFF;
 		cout << (int)message[0] << " " << (int)message[5] << " " << (int)message[6] << endl;
 		canif->can_message(20001, message, 7, 1, CAN_NODE);
 
@@ -82,14 +82,14 @@ public:
 		}
 		message[0] = 3;
 		half = floatToHalf(0);
-		message[1] = half & 0x0F;
-		message[2] = (half >> 8) & 0x0F;
+		message[1] = half & 0xFF;
+		message[2] = (half >> 8) & 0xFF;
 		half = floatToHalf(0);
-		message[3] = half & 0x0F;
-		message[4] = (half >> 8) & 0x0F;
+		message[3] = half & 0xFF;
+		message[4] = (half >> 8) & 0xFF;
 		half = floatToHalf(4);
-		message[5] = half & 0x0F;
-		message[6] = (half >> 8) & 0x0F;
+		message[5] = half & 0xFF;
+		message[6] = (half >> 8) & 0xFF;
 		cout << (int)message[0] << " " << (int)message[5] << " " << (int)message[6] << endl;
 		canif->can_message(20001, message, 7, 2, CAN_NODE);
 		cout << "[" << sc_time_stamp() << "] Dropping altitude to 4m" << endl;

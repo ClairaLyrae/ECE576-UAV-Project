@@ -20,7 +20,6 @@ public:
 	virtual bool can_transmit(unsigned char priority) = 0;
 	virtual bool can_message(unsigned short msgID, uint8_t* payload, unsigned char paylength, unsigned char transferID, unsigned char sourceID) = 0;
 	virtual bool can_service(unsigned short msgID, uint8_t* payload, unsigned char paylength, unsigned char transferID, unsigned char sourceID, unsigned char destinationID) = 0;
-	virtual void JUNK() = 0;
 
 };
 
@@ -39,10 +38,6 @@ public:
 	uav_can_bus(sc_module_name name) : sc_module(name)
 	{
 		SC_THREAD(arbiter);
-	}
-
-	void JUNK() {
-		return;
 	}
 
 	unsigned char can_listen(unsigned short &msgID, uint8_t* payload, unsigned char &paylength, unsigned char &transferID, unsigned char &sourceID)

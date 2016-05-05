@@ -17,13 +17,13 @@ public:
 
 	void interpret(uint8_t* buff) {
 		unsigned i;
-		uint32_t raw;
+		uint16_t raw;
 		uint8_t header = buff[0];
-		enableAttPID = header & 0x80;
-		enablePosPID = header & 0x40;
-		enableLatPosPID = header & 0x20;
-		enableRollPitchCmd = header & 0x10;
-		dataType = header & 0x0F;
+		enableAttPID = header & 0x01;
+		enablePosPID = header & 0x02;
+		enableLatPosPID = header & 0x04;
+		enableRollPitchCmd = header & 0x08;
+		dataType = header & 0xF0;
 		cout << sc_time_stamp() << ": Att: " << enableAttPID << " Pos: " << enablePosPID << " Lat: "  << enableLatPosPID << " Roll: "  << enableRollPitchCmd << endl;
 		switch(dataType)
 		{
