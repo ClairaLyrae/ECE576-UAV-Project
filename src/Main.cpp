@@ -48,6 +48,7 @@ public:
 	PWM_bus* pwm_bus_3;
 	PWM_bus* pwm_bus_4;
 	i2c_bus* iic_bus;
+	uav_can_bus* can_bus;
 
 	LSM6DS3* sensor_acc_gyro;
 	LIS3MDL* sensor_mag;
@@ -56,7 +57,10 @@ public:
 
 	Top(sc_module_name name) : sc_module(name)
 	{
-		// Bus
+		// CAN Bus
+		can_bus = new uav_can_bus("CAN_BUS");
+
+		// I2C Bus
 		iic_bus = new i2c_bus("I2C_BUS", I2C_CLK_FREQ);
 		pwm_bus_1 = new PWM_bus("PWM_BUS_1", PWM_CLK_FREQ);
 		pwm_bus_2 = new PWM_bus("PWM_BUS_2", PWM_CLK_FREQ);
@@ -65,6 +69,7 @@ public:
 
 		// Processor Module
 		proc = new Processor("PROCESSOR");
+		proc->canif(*can_bus);
 
 		// Sensors
 		sensor_acc_gyro = new LSM6DS3("SENSOR_ACC_GYRO");
@@ -74,7 +79,7 @@ public:
 		sensor_baro = new LPS22HB("SENSOR_BARO");
 		sensor_baro->i2c_slv(*iic_bus);
 		sensor_gps = new A2235H("SENSOR_GPS");
-		sensor_gps->i2c_slv(*iic_bus);
+		sensor_gps->canif(*can_bus);
 
 		// UAV Physics Model
 		uav = new PhysicsObject(UAV_MASS, UAV_LENGTH, UAV_WIDTH, UAV_HEIGHT);
@@ -111,11 +116,13 @@ public:
 		hardware->pwm_out_3(*pwm_bus_3);
 		hardware->pwm_out_4(*pwm_bus_4);
 		hardware->enableLog("uav_motor_log.txt");
+		hardware->canif(*can_bus);
 	}
 };
 
 // System C Main
 int sc_main(int argc, char *argv[]) {
+
 
 	// Instantiate modules
 	Top top_inst("TOP");

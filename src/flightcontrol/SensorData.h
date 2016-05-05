@@ -8,6 +8,11 @@ public:
 	double gyro[3];
 	double accel[3];
 	double mag[3];
+	float gps_longitude;
+	float gps_latitude;
+	float gps_altitude;
+	float gps_heading;
+	float gps_velocity;
 };
 
 #endif

@@ -10,13 +10,10 @@
 class i2c_mst_if : virtual public sc_interface
 {
 public:
-	virtual void i2c_start(uint8_t addr, bool rw) = 0;
-	virtual void mst_i2c_write(uint8_t data, bool stop) = 0;
-	virtual void mst_i2c_read(uint8_t &data, bool stop) = 0;
-	virtual void i2c_continue(uint8_t addr, bool rw) = 0;
-	virtual void i2c_stop() = 0;
 	virtual void i2c_write(uint8_t addr, uint8_t reg, uint8_t len, uint8_t *data) = 0;
 	virtual void i2c_read(uint8_t addr, uint8_t reg, uint8_t len, uint8_t *data) = 0;
+	virtual void mst_i2c_send(uint8_t data, bool stop) = 0;
+	virtual void mst_i2c_rec(uint8_t &data, bool stop) = 0;
 };
 
 class i2c_slv_if : virtual public sc_interface
@@ -35,40 +32,7 @@ private:
 	uint8_t transfer, dest, end;
 	bool rdnwr;
 	sc_mutex i2c_active;
-
 	uint8_t period_ns;
-public:
-	SC_HAS_PROCESS(i2c_bus);
-
-	i2c_bus(sc_module_name name, double freq) : sc_module(name)
-	{
-		period_ns = 1000000000.0/freq;
-		transfer = 0;
-		dest = 0;
-		end = 0;
-		rdnwr = false;
-	}
-
-	void i2c_write(uint8_t addr, uint8_t reg, uint8_t len, uint8_t *data) {
-		uint8_t i = 0;
-		i2c_start(addr, I2C_WRITE);
-		mst_i2c_write(reg, true);
-		for(i = 0; i < len; i++) {
-			mst_i2c_write(data[i], (i == len-1) ? true : false);
-		}
-		i2c_stop();
-	}
-
-	void i2c_read(uint8_t addr, uint8_t reg, uint8_t len, uint8_t *data) {
-		uint8_t i = 0;
-		i2c_start(addr, I2C_WRITE);
-		mst_i2c_write(reg, true);
-		i2c_continue(addr, I2C_READ);
-		for(i = 0; i < len; i++) {
-			mst_i2c_read(data[i], (i == len-1) ? true : false);
-		}
-		i2c_stop();
-	}
 
 	void i2c_start(uint8_t addr, bool rw)
 	{
@@ -90,6 +54,40 @@ public:
 		wait(i2c_ack);
 		return;
 	}
+public:
+	SC_HAS_PROCESS(i2c_bus);
+
+	i2c_bus(sc_module_name name, double freq) : sc_module(name)
+	{
+		period_ns = 1000000000.0/freq;
+		transfer = 0;
+		dest = 0;
+		end = 0;
+		rdnwr = false;
+	}
+
+	void i2c_write(uint8_t addr, uint8_t reg, uint8_t len, uint8_t *data) {
+		uint8_t i = 0;
+		i2c_start(addr, I2C_WRITE);
+		mst_i2c_send(reg, true);
+		for(i = 0; i < len; i++) {
+			mst_i2c_send(data[i], (i == len-1) ? true : false);
+		}
+		wait(period_ns,SC_NS);
+		i2c_active.unlock();
+	}
+
+	void i2c_read(uint8_t addr, uint8_t reg, uint8_t len, uint8_t *data) {
+		uint8_t i = 0;
+		i2c_start(addr, I2C_WRITE);
+		mst_i2c_send(reg, true);
+		i2c_continue(addr, I2C_READ);
+		for(i = 0; i < len; i++) {
+			mst_i2c_rec(data[i], (i == len-1) ? true : false);
+		}
+		wait(period_ns,SC_NS);
+		i2c_active.unlock();
+	}
 
 	void i2c_listen(uint8_t &addr, bool &rw)
 	{
@@ -106,14 +104,7 @@ public:
 		return;
 	}
 
-	void i2c_stop()
-	{
-		wait(period_ns,SC_NS);
-		i2c_active.unlock();
-		return;
-	}
-
-	void mst_i2c_write(uint8_t data, bool stop)
+	void mst_i2c_send(uint8_t data, bool stop)
 	{
 		transfer = data;
 		end = stop;
@@ -133,7 +124,7 @@ public:
 		return;
 	}
 
-	void mst_i2c_read(uint8_t &data, bool stop)
+	void mst_i2c_rec(uint8_t &data, bool stop)
 	{
 		end = stop;
 		wait(data_ready);

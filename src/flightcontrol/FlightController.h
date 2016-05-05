@@ -4,13 +4,15 @@
 #include <systemc.h>
 #include "../PWM.h"
 #include "../I2C.h"
+#include "../UAVCAN.h"
 #include "AltitudeEstimator.h"
 #include "PID.h"
-#include "AHRS.h"
+#include "Commands.h"
 #include "../physics/PhysicsModules.h"
 #include "SensorData.h"
 #include "gmtl/gmtl.h"
 #include <stdint.h>
+#include "../util/extrause.h"
 
 #define I2C_WRITE false
 #define I2C_READ true
@@ -66,18 +68,22 @@ private:
 	string outfilename;
 	bool enablelog;
 public:
+	static const unsigned char CAN_NODE = 2;
+
 	// Ports
 	sc_port<i2c_mst_if> i2c_mst;
 	sc_port<PWM_out> pwm_out_1;
 	sc_port<PWM_out> pwm_out_2;
 	sc_port<PWM_out> pwm_out_3;
 	sc_port<PWM_out> pwm_out_4;
+	sc_port<uav_can_if> canif;
 
 	// Motor output values
 	double motor[4];
 
-	// Sensor data
+	// Sensor/Command data
 	Sensors sensor;
+	Command cmd;
 
 	// Calculated IMU Data
 	Vec3d attitude_rate;
@@ -88,16 +94,8 @@ public:
 	double baro_altitude;
 	double altitude;
 
-	// PID targets
-	float attCmd[3];
-	double rateCmd[3];
-	float posCmd[3];
-	double velCmd[3];
-
 	// PIDs
 	bool enablePID;
-	bool enableAttPID;
-	bool enablePosPID;
 	PID attPID[3];
 	PID ratePID[3];
 	PID posPID[3];
@@ -118,7 +116,8 @@ public:
 		SC_THREAD(mainI2C);
 		SC_THREAD(mainIMU);
 		SC_THREAD(mainTimer);
-		SC_THREAD(mainPilot);
+		//SC_THREAD(mainPilot);
+		SC_THREAD(mainUAVCAN);
 
 		this->sim = physim;
 		this->uav = vehicle;
@@ -136,14 +135,18 @@ public:
 		ratePID[ROLL].initialize(7, 1, 0, 1, 0, 0);
 		ratePID[PITCH].initialize(7, 1, 0, 1, 0, 0);
 		ratePID[YAW].initialize(7, 1, 0, 1, 0, 0);
-		enablePID = false;
+		enablePID = true;
 		enablelog = false;
+		cmd.posCmd[XAXIS] = 0;	cmd.posCmd[YAXIS] = 0;	cmd.posCmd[ZAXIS] = 0;
+		cmd.attCmd[ROLL] = 0;	cmd.attCmd[PITCH] = 0;	cmd.attCmd[YAW] = 0;
+		cmd.rateCmd[ROLL] = 0;	cmd.rateCmd[PITCH] = 0;	cmd.rateCmd[YAW] = 0;
 	}
 
 	void mainIMU();
 	void mainPilot();
 	void mainI2C();
 	void mainTimer();
+	void mainUAVCAN();
 
 	void setThrottle(double m1, double m2, double m3, double m4) {
 		motor[0] = m1;
@@ -205,27 +208,6 @@ public:
 /////////////////////////////////////////////////
 // System C Threads
 /////////////////////////////////////////////////
-
-// Temporary pilot command generation thread
-void FlightController::mainPilot() {
-	// Initialization
-	enablePID = false;
-	enableAttPID = true;
-	enablePosPID = true;
-	posCmd[XAXIS] = 0;	posCmd[YAXIS] = 0;	posCmd[ZAXIS] = 0;
-	attCmd[ROLL] = 0;	attCmd[PITCH] = 0;	attCmd[YAW] = 0;
-	rateCmd[ROLL] = 0;	rateCmd[PITCH] = 0;	rateCmd[YAW] = 0;
-
-	// Flight sequence
-	cout << "[" << sc_time_stamp() << "] Enabling PID control" << endl;
-	enablePID = true;
-	cout << "[" << sc_time_stamp() << "] Targeting altitude of 15m, yaw rate of 5deg/s" << endl;
-	posCmd[ZAXIS] = 15;
-	attCmd[YAW] = 45*M_PI/180;
-	wait(5000, SC_MS);
-	cout << "[" << sc_time_stamp() << "] Dropping altitude to 4m" << endl;
-	posCmd[ZAXIS] = 4;
-}
 
 // Internal timer, generates interrupts at specific intervals
 // Also updates the motor PWM outputs
@@ -332,31 +314,31 @@ void FlightController::mainIMU() {
 		// Apply PID Controllers
 		if(enablePID) {
 			// Compute error terms for roll and pitch in attitude mode, apply to PIDs as feedback
-			if(enableAttPID) {
-				error = wrapRadians(attCmd[ROLL] - attitude[ROLL]);
-				rateCmd[ROLL] = attPID[ROLL].update(error, dt);
-				error = wrapRadians(attCmd[PITCH] + attitude[PITCH]);
-				rateCmd[PITCH] = attPID[PITCH].update(error, dt);
-				error = wrapRadians(attCmd[YAW] - attitude[YAW]);
-				rateCmd[YAW] = attPID[YAW].update(error, dt);
+			if(cmd.enableAttPID) {
+				error = wrapRadians(cmd.attCmd[ROLL] - attitude[ROLL]);
+				cmd.rateCmd[ROLL] = attPID[ROLL].update(error, dt);
+				error = wrapRadians(cmd.attCmd[PITCH] + attitude[PITCH]);
+				cmd.rateCmd[PITCH] = attPID[PITCH].update(error, dt);
+				error = wrapRadians(cmd.attCmd[YAW] - attitude[YAW]);
+				cmd.rateCmd[YAW] = attPID[YAW].update(error, dt);
 			}
 
 			// Compute error terms for roll, pitch and yaw from rate, apply to PIDs as feedback
-			error = rateCmd[ROLL] - attitude_rate[ROLL];
+			error = cmd.rateCmd[ROLL] - attitude_rate[ROLL];
 			ratePID[ROLL].update(error, dt);
-			error = rateCmd[PITCH] + attitude_rate[PITCH];
+			error = cmd.rateCmd[PITCH] + attitude_rate[PITCH];
 			ratePID[PITCH].update(error, dt);
-			error = rateCmd[YAW] - attitude_rate[YAW];
+			error = cmd.rateCmd[YAW] - attitude_rate[YAW];
 			ratePID[YAW].update(error, dt);
 
 			// Compute error term for position based off estimation/integration, apply to PIDs as feedback
-			if(enablePosPID) {
-				error = posCmd[ZAXIS] - pos[ZAXIS];
-				velCmd[ZAXIS] = posPID[ZAXIS].update(error, dt);
+			if(cmd.enablePosPID) {
+				error = cmd.posCmd[ZAXIS] - pos[ZAXIS];
+				cmd.velCmd[ZAXIS] = posPID[ZAXIS].update(error, dt);
 			}
 
 			// Compute error term for velocity based off estimation/integration, apply to PIDs as feedback
-			error = velCmd[ZAXIS] - vel[ZAXIS];
+			error = cmd.velCmd[ZAXIS] - vel[ZAXIS];
 			throttleCmd = 0.5 + velPID[ZAXIS].update(error, dt);
 
 			// Compute Cosine of constrained Roll/Pitch Angles and Multiply by Att-Alt Gain
@@ -411,6 +393,73 @@ void FlightController::mainIMU() {
 			}
 		}
 		wait(1, SC_MS);
+	}
+}
+
+void FlightController::mainUAVCAN() {
+	uint8_t message[7];
+	unsigned char target, length, transfer, source;
+	unsigned short msgType;
+	unsigned char lat_c, long_c, gps_c;
+	uint32_t temp;
+	sensor.gps_heading = 0;
+	sensor.gps_altitude = 0;
+	sensor.gps_latitude = 0;
+	sensor.gps_longitude = 0;
+	sensor.gps_velocity = 0;
+
+
+	while(true)
+	{
+		target = canif->can_listen(msgType, message, length, transfer, source);
+		if (target == 0)
+		{
+			switch(msgType)
+			{
+				case 20001:
+					//SW commands
+					cout << sc_time_stamp() << ": Hey, you gave an order to the HW! Good for you. :)" << endl;
+					cmd.interpret(message); //cmd.interpret(// data pointer 7 bytes);
+					break;
+				//take in GPS data
+				case 20002:
+					//lat
+					temp = (message[3] << 24) & (message[2] << 16) & (message[1] << 8) & message[0];
+					sensor.gps_latitude = *((float*)&temp);
+					lat_c = transfer;
+					break;
+				case 20003:
+					//long
+					temp = (message[3] << 24) & (message[2] << 16) & (message[1] << 8) & message[0];
+					sensor.gps_longitude = *((float*)&temp);
+					long_c = transfer;
+					break;
+				case 20004:
+					//alt and more
+					sensor.gps_heading = halfToFloat((uint16_t)((message[1] << 8) & message[0]));
+					sensor.gps_velocity = halfToFloat((uint16_t)((message[3] << 8) & message[2]));
+					sensor.gps_altitude = halfToFloat((uint16_t)((message[5] << 8) & message[4]));
+					gps_c = transfer;
+					if(lat_c == long_c and long_c == gps_c)
+					{
+						//notify gps update
+					}
+					break;
+				default:
+					break;
+			}
+		}
+		else if (target == CAN_NODE)
+		{
+			switch(msgType)
+			{
+				case 201:
+					//interpret and notify data request
+					break;
+				default:
+					break;
+			}
+		}
 	}
 }
 

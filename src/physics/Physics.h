@@ -231,6 +231,8 @@ void PhysicsSim::main() {
 			p->update(delta_ms*0.001, *this);
 		}
 		time += delta_ms*0.001;
+		if((int)(time*1000)%1000 == 0)
+			cout << "Physics time (t=" << time << "s)" << endl;
 		event_sim_delta.notify();
 	}
 	cout << "Physics simulation end (t=" << time << "s)" << endl;

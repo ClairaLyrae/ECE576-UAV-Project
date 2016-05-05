@@ -2,6 +2,7 @@
 #define UAVCAN_H_
 
 #include <systemc.h>
+#include <stdint.h>
 
 #define CAN_SPEED 1000 //ns
 
@@ -15,19 +16,21 @@ Transfer ID 5 bits.
 class uav_can_if : virtual public sc_interface
 {
 public:
-	virtual unsigned char can_listen(unsigned short &msgID, unsigned char &payload[], unsigned char &paylength, unsigned char &transferID, unsigned char &sourceID) = 0;
+	virtual unsigned char can_listen(unsigned short &msgID, uint8_t* payload, unsigned char &paylength, unsigned char &transferID, unsigned char &sourceID) = 0;
 	virtual bool can_transmit(unsigned char priority) = 0;
-	virtual bool can_message(unsigned short msgID, unsigned char payload[], unsigned char paylength, unsigned char transferID, unsigned char sourceID) = 0;
-	virtual bool can_service(unsigned short msgID, unsigned char payload[], unsigned char paylength, unsigned char transferID, unsigned char sourceID, unsigned char destinationID) = 0;
+	virtual bool can_message(unsigned short msgID, uint8_t* payload, unsigned char paylength, unsigned char transferID, unsigned char sourceID) = 0;
+	virtual bool can_service(unsigned short msgID, uint8_t* payload, unsigned char paylength, unsigned char transferID, unsigned char sourceID, unsigned char destinationID) = 0;
+	virtual void JUNK() = 0;
+
 };
 
 class uav_can_bus : public sc_module, public uav_can_if
 {
 private:
-	bool idle, sof, ack, interframe;
+	bool idle, ack, interframe;
 	unsigned char priorityHigh, byteCount, tailbyte, sourceNode, destinationNode;
 	unsigned short dataType;
-	unsigned char contents[7];
+	uint8_t contents[7];
 	unsigned i;
 
 public:
@@ -38,7 +41,11 @@ public:
 		SC_THREAD(arbiter);
 	}
 
-	unsigned char can_listen(unsigned short &msgID, unsigned char &payload[], unsigned char &paylength, unsigned char &transferID, unsigned char &sourceID)
+	void JUNK() {
+		return;
+	}
+
+	unsigned char can_listen(unsigned short &msgID, uint8_t* payload, unsigned char &paylength, unsigned char &transferID, unsigned char &sourceID)
 	{
 		wait(frameReady);
 		msgID = dataType;
@@ -62,7 +69,7 @@ public:
 		}
 		if(idle)
 		{
-			sof = true;
+			sof.notify();
 			if(priority < priorityHigh)
 			{
 				priorityHigh = priority;
@@ -83,7 +90,7 @@ public:
 		}
 	}
 
-	bool can_message(unsigned short msgID, unsigned char payload[], unsigned char paylength, unsigned char transferID, unsigned char sourceID)
+	bool can_message(unsigned short msgID, uint8_t* payload, unsigned char paylength, unsigned char transferID, unsigned char sourceID)
 	{
 		dataType = msgID;
 		for(i = 0; i < paylength; i++)
@@ -99,7 +106,7 @@ public:
 		return ack;
 	}
 
-	bool can_service(unsigned short msgID, unsigned char payload[], unsigned char paylength, unsigned char transferID, unsigned char sourceID, unsigned char destinationID)
+	bool can_service(unsigned short msgID, uint8_t* payload, unsigned char paylength, unsigned char transferID, unsigned char sourceID, unsigned char destinationID)
 	{
 		dataType = msgID;
 		for(i = 0; i < paylength; i++)
@@ -120,14 +127,12 @@ public:
 		while(1)
 		{
 			priorityHigh = 32;
-			sof = false;
 			ack = false;
 			interframe = false;
 			idle = true;
 			canIdle.notify();
-			do{
-				wait(CAN_SPEED,SC_NS);
-			}while(!sof);
+			wait(sof);
+			wait(CAN_SPEED,SC_NS);
 			idle = false;
 			wait(34*CAN_SPEED,SC_NS);
 			priorityCheck.notify();
@@ -143,7 +148,7 @@ public:
 		}
 	}
 
-	sc_event canIdle, priorityCheck, frameLoaded, frameReady, canRelease;
+	sc_event canIdle, priorityCheck, frameLoaded, frameReady, canRelease, sof;
 };
 
 #endif /* UAVCAN_H_ */

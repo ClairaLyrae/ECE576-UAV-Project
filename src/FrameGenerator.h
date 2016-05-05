@@ -1,14 +1,8 @@
-/*
- * FrameGenerator.h
- *
- *  Created on: May 2, 2016
- *      Author: Damen
- */
-
 #ifndef FRAMEGENERATOR_H_
 #define FRAMEGENERATOR_H_
 
 #include <systemc.h>
+#include "UAVCAN.h"
 
 class uavcan_traffic_gen : public sc_module
 {
@@ -32,15 +26,15 @@ public:
 			{
 				target = canif->can_listen(msgType, message, length, transfer, source);
 			}
-			canif->can_message(1,traff,7,0,node); //change these
+			canif->can_message(20099,traff,7,0,node);
 		}
 	}
 
 private:
 	unsigned wait_min, wait_var;
 	unsigned short msgType;
-	unsigned char message[7];
-	unsigned char traff[7];
+	uint8_t message[7];
+	uint8_t traff[7];
 	unsigned char transfer, source, target, length, priority, node;
 };
 
