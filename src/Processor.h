@@ -51,9 +51,6 @@ public:
 
 	void mainSW() {
 		uav_can_msg msg;
-		bool enableAttPID = true;
-		bool enableAltPID = true;
-		bool enableLatPID = false;
 
 		// Initialization
 		unsigned i;

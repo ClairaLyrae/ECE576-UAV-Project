@@ -416,7 +416,7 @@ void FlightController::mainUAVCAN() {
 			}
 		} else if(msg.destID == CAN_NODE && msg.msgID == UAVCAN_FLIGHT_CON) {
 			float fa, fb, fc;
-			uint8_t header, dataType, i;
+			uint8_t header, dataType;
 
 			msg.unpackByteFloat16(header, fa, fb, fc);
 			cmd.enableAttPID = ((header & 0x80) != 0);
