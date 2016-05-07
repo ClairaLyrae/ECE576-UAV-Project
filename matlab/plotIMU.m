@@ -27,7 +27,7 @@ grid on;
 hold on;
 title('UAV Flight Velocities');
 xlabel('Time');
-ylabel('Position (m/s)');
+ylabel('Velocity (m/s)');
 plot(t, v(:,1), '-b');
 plot(t, v(:,2), '-g');
 plot(t, v(:,3), '-r');

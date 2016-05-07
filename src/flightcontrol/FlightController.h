@@ -4,7 +4,9 @@
 #include <systemc.h>
 #include "../PWM.h"
 #include "../I2C.h"
-#include "../UAVCAN.h"
+#include "../uavcan/UAVCAN.h"
+#include "../uavcan/FrameTypes.h"
+#include "../uavcan/FrameGenerator.h"
 #include "AltitudeEstimator.h"
 #include "PID.h"
 #include "Commands.h"
@@ -19,6 +21,8 @@
 
 #define M_PI 3.14159265359
 #define M_PI_2 1.57079632679
+#define RAD_TO_DEG 57.2957795131
+#define DEG_TO_RAD 0.01745329251
 
 #define XAXIS 0
 #define YAXIS 1
@@ -112,8 +116,8 @@ public:
 		SC_THREAD(mainI2C);
 		SC_THREAD(mainIMU);
 		SC_THREAD(mainTimer);
-		SC_THREAD(mainPilot);
-		//SC_THREAD(mainUAVCAN);
+		//SC_THREAD(mainPilot);
+		SC_THREAD(mainUAVCAN);
 
 		this->sim = physim;
 		this->uav = vehicle;
@@ -130,7 +134,7 @@ public:
 		attPID[YAW].initialize(2, 2, 0, M_PI_2, 0, 0);
 		ratePID[ROLL].initialize(7, 1, 0, 1, 0, 0);
 		ratePID[PITCH].initialize(7, 1, 0, 1, 0, 0);
-		ratePID[YAW].initialize(7, 1, 0, 0.5, 0, 0);
+		ratePID[YAW].initialize(12, 1, 0, 1, 0, 0);
 		enablePID = true;
 		enablelog = false;
 		cmd.posCmd[XAXIS] = 0;	cmd.posCmd[YAXIS] = 0;	cmd.posCmd[ZAXIS] = 0;
@@ -329,7 +333,7 @@ void FlightController::mainIMU() {
 			ratePID[YAW].update(error, dt);
 
 			// Compute error term for position based off estimation/integration, apply to PIDs as feedback
-			if(cmd.enablePosPID) {
+			if(cmd.enableAltPID) {
 				error = cmd.posCmd[ZAXIS] - pos[ZAXIS];
 				cmd.velCmd[ZAXIS] = posPID[ZAXIS].update(error, dt);
 			}
@@ -388,137 +392,69 @@ void FlightController::mainIMU() {
 }
 
 void FlightController::mainUAVCAN() {
-	uint8_t message[7];
-	unsigned char target, length, transfer, source;
-	unsigned short msgType;
-	unsigned char lat_c, long_c, gps_c;
-	uint32_t temp;
-	sensor.gps_heading = 0;
-	sensor.gps_altitude = 0;
-	sensor.gps_latitude = 0;
-	sensor.gps_longitude = 0;
-	sensor.gps_velocity = 0;
-
+	uav_can_msg msg;
 
 	while(true)
 	{
-		target = canif->can_listen(msgType, message, length, transfer, source);
-		if (target == 0)
-		{
-			switch(msgType)
-			{
-				case 20001:
-					//SW commands
-					cout << sc_time_stamp() << ": Hey, you gave an order to the HW! Good for you. :)" << endl;
-					cmd.interpret(message); //cmd.interpret(// data pointer 7 bytes);
+		canif->can_listen(msg);
+		if (msg.isBroadcast()) {
+			switch(msg.msgID) {
+				case UAVCAN_GPS_LAT:
+					msg.unpackFloat32(sensor.gps_latitude);
+					cout << "[" << sc_time_stamp() << "] Flight controller received GPS Latitude" << endl;
 					break;
-				//take in GPS data
-				case 20002:
-					//lat
-					temp = (message[3] << 24) & (message[2] << 16) & (message[1] << 8) & message[0];
-					sensor.gps_latitude = *((float*)&temp);
-					lat_c = transfer;
+				case UAVCAN_GPS_LONG:
+					msg.unpackFloat32(sensor.gps_longitude);
+					cout << "[" << sc_time_stamp() << "] Flight controller received GPS Longitude" << endl;
 					break;
-				case 20003:
-					//long
-					temp = (message[3] << 24) & (message[2] << 16) & (message[1] << 8) & message[0];
-					sensor.gps_longitude = *((float*)&temp);
-					long_c = transfer;
-					break;
-				case 20004:
-					//alt and more
-					sensor.gps_heading = halfToFloat((uint16_t)((message[1] << 8) & message[0]));
-					sensor.gps_velocity = halfToFloat((uint16_t)((message[3] << 8) & message[2]));
-					sensor.gps_altitude = halfToFloat((uint16_t)((message[5] << 8) & message[4]));
-					gps_c = transfer;
-					if(lat_c == long_c and long_c == gps_c)
-					{
-						//notify gps update
-					}
+				case UAVCAN_GPS_HVA:
+					msg.unpackFloat16(sensor.gps_heading, sensor.gps_velocity, sensor.gps_altitude);
+					cout << "[" << sc_time_stamp() << "] Flight controller received GPS HVA" << endl;
 					break;
 				default:
 					break;
 			}
-		}
-		else if (target == CAN_NODE)
-		{
-			switch(msgType)
+		} else if(msg.destID == CAN_NODE && msg.msgID == UAVCAN_FLIGHT_CON) {
+			float fa, fb, fc;
+			uint8_t header, dataType, i;
+
+			msg.unpackByteFloat16(header, fa, fb, fc);
+			cmd.enableAttPID = ((header & 0x80) != 0);
+			cmd.enableAltPID = ((header & 0x40) != 0);
+			cmd.enableLatPID = ((header & 0x20) != 0);
+			dataType = header & 0x0F;
+			switch(dataType)
 			{
-				case 201:
-					//interpret and notify data request
-					break;
-				default:
-					break;
+			case 0:
+				cmd.posCmd[XAXIS] = fa;
+				cmd.posCmd[YAXIS] = fb;
+				cmd.posCmd[ZAXIS] = fc;
+				cout << "[" << sc_time_stamp() << "] Flight controller received pos cmd: " << fa << " m, " << fb << " m, " << fc << " m" << endl;
+				break;
+			case 1:	// Velocity command
+				cmd.velCmd[XAXIS] = fa;
+				cmd.velCmd[YAXIS] = fb;
+				cmd.velCmd[ZAXIS] = fc;
+				cout << "[" << sc_time_stamp() << "] Flight controller received vel cmd: " << fa << " m/s, " << fb << " m/s, " << fc << " m/s" << endl;
+				break;
+			case 2:
+				cmd.attCmd[ROLL] = fa;
+				cmd.attCmd[PITCH] = fb;
+				cmd.attCmd[YAW] = fc;
+				cout << "[" << sc_time_stamp() << "] Flight controller received att cmd: " << fa*RAD_TO_DEG << " deg, " << fb*RAD_TO_DEG << " deg, " << fc*RAD_TO_DEG << " deg" << endl;
+				break;
+			case 3:
+				cmd.rateCmd[ROLL] = fa;
+				cmd.rateCmd[PITCH] = fb;
+				cmd.rateCmd[YAW] = fc;
+				cout << "[" << sc_time_stamp() << "] Flight controller received rate cmd: " << fa*RAD_TO_DEG << " deg/s, " << fb*RAD_TO_DEG << " deg/s, " << fc*RAD_TO_DEG << " deg/s" << endl;
+				break;
+			default:
+				cout << "[" << sc_time_stamp() << "] Flight controller failed to interpret command." << endl;
+				break;
 			}
 		}
 	}
-}
-
-
-// Temporary pilot command generation thread
-void FlightController::mainPilot() {
-	// Initialization
-	enablePID = true;
-	cmd.enableAttPID = true;
-	cmd.enablePosPID = true;
-	unsigned int test = 4;
-	unsigned i;
-	double tgt;
-	srand(time(0));
-	switch(test) {
-	case 0 :
-		cmd.enablePosPID = true;
-		for(i = 0; i < 4; i++) {
-			tgt = round(((float)rand()/RAND_MAX)*30) - 10;
-			cout << "[" << sc_time_stamp() << "] Targeting altitude of " << tgt << "m" << endl;
-			cmd.posCmd[ZAXIS] = tgt;
-			wait(5000, SC_MS);
-		}
-		break;
-	case 1 :
-		cmd.enablePosPID = false;
-		for(i = 0; i < 4; i++) {
-			tgt = ((float)rand()/RAND_MAX)*6.0 - 2;
-			cout << "[" << sc_time_stamp() << "] Targeting vertical velocity of " << tgt << "m/s" << endl;
-			cmd.velCmd[ZAXIS] = tgt;
-			wait(5000, SC_MS);
-		}
-		break;
-	case 2 :
-		cmd.enablePosPID = true;
-		cmd.enableAttPID = true;
-		for(i = 0; i < 4; i++) {
-			tgt = ((float)rand()/RAND_MAX)*M_PI;
-			cout << "[" << sc_time_stamp() << "] Targeting yaw of " << tgt*180/M_PI << "deg" << endl;
-			cmd.attCmd[YAW] = tgt;
-			wait(5000, SC_MS);
-		}
-		break;
-	case 3 :
-		cmd.enablePosPID = true;
-		cmd.enableAttPID = true;
-		for(i = 0; i < 4; i++) {
-			tgt = ((float)rand()/RAND_MAX)*(M_PI/2) - (M_PI/4);
-			cout << "[" << sc_time_stamp() << "] Targeting pitch of " << tgt*180/M_PI << "deg" << endl;
-			cmd.attCmd[PITCH] = tgt;
-			wait(5000, SC_MS);
-		}
-		break;
-	case 4 :
-		cmd.enablePosPID = true;
-		cmd.enableAttPID = true;
-		for(i = 0; i < 4; i++) {
-			tgt = ((float)rand()/RAND_MAX)*(M_PI/2) - (M_PI/4);
-			cout << "[" << sc_time_stamp() << "] Targeting pitch of " << tgt*180/M_PI << "deg" << endl;
-			cmd.attCmd[PITCH] = tgt;
-			tgt = ((float)rand()/RAND_MAX)*(M_PI/2) - (M_PI/4);
-			cout << "[" << sc_time_stamp() << "] Targeting roll of " << tgt*180/M_PI << "deg" << endl;
-			cmd.attCmd[ROLL] = tgt;
-			wait(5000, SC_MS);
-		}
-		break;
-	}
-
 }
 
 #endif

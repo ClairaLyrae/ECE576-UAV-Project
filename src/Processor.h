@@ -5,26 +5,22 @@
 
 #include <systemc.h>
 #include <stdint.h>
-#include "UAVCAN.h"
 #include "util/util.h"
+#include "flightcontrol/FlightController.h"
+#include "uavcan/UAVCAN.h"
+#include "uavcan/FrameTypes.h"
 
 // Processor Module
 class Processor : public sc_module
 {
 private:
-	unsigned i;
-	uint8_t message[7];
-	unsigned char target, length, transfer, source;
-	unsigned short msgType;
-	unsigned char lat_c, long_c, gps_c;
-	uint8_t hw_req[7];
-	unsigned short tf_wait;
-	float lati, longi, altt, velo, headn;
-	uint32_t temp;
-	uint16_t half;
+	float gps_latitude, gps_longitude, gps_heading, gps_altitude, gps_velocity;
+	float pid_test_period_ms;
+	unsigned pid_test;
 
 public:
 	static const unsigned char CAN_NODE = 1;
+	static const unsigned char CAN_PRIORITY = 5;
 
 	SC_HAS_PROCESS(Processor);
 
@@ -33,117 +29,96 @@ public:
 	sc_event canFree;
 
 	Processor(sc_module_name name) : sc_module(name) {
-		//SC_THREAD(main);
-		//SC_THREAD(can_monitor);
+		SC_THREAD(mainSW);
+		SC_THREAD(mainUAVCAN);
+		pid_test = 5;
+		pid_test_period_ms = 5000.0;
 	}
 
-	void main() {
-		//send setup (configure things here)
-		while(!canif->can_transmit(1)) //set priority
-		{
-			wait(canFree);
+	void setPIDTest(unsigned type, float period_ms) {
+		pid_test = type;
+		pid_test_period_ms = period_ms;
+	}
+
+	void sendFlightCommand(uint8_t header, float x, float y, float z) {
+		uav_can_msg msg;
+		while(!canif->can_transmit(CAN_PRIORITY))
+			canif->can_listen(msg);
+		msg.set(UAVCAN_FLIGHT_CON, 0, CAN_NODE, FlightController::CAN_NODE);
+		msg.packByteFloat16(header, x, y, z);
+		canif->can_message(msg);
+	}
+
+	void mainSW() {
+		uav_can_msg msg;
+		bool enableAttPID = true;
+		bool enableAltPID = true;
+		bool enableLatPID = false;
+
+		// Initialization
+		unsigned i;
+		double tgt, tgt2;
+		for(i = 0; i < 4; i++) {
+			switch(pid_test) {
+				case 0:
+					tgt = round(((float)rand()/RAND_MAX)*30) - 10;
+					cout << "[" << sc_time_stamp() << "] Processor sent altitude of " << tgt << " m" << endl;
+					sendFlightCommand(0xC0, 0.0, 0.0, tgt);
+					break;
+				case 1:
+					tgt = ((float)rand()/RAND_MAX)*6.0 - 2;
+					cout << "[" << sc_time_stamp() << "] Processor sent vertical velocity of " << tgt << " m/s" << endl;
+					sendFlightCommand(0x81, 0.0, 0.0, tgt);
+					break;
+				case 2:
+					tgt = ((float)rand()/RAND_MAX)*M_PI;
+					cout << "[" << sc_time_stamp() << "] Processor sent yaw of " << tgt*180/M_PI << " deg" << endl;
+					sendFlightCommand(0xC2, 0.0, 0.0, tgt);
+					break;
+				case 3:
+					tgt = ((float)rand()/RAND_MAX)*(M_PI/2) - (M_PI/4);
+					cout << "[" << sc_time_stamp() << "] Processor sent pitch of " << tgt*180/M_PI << " deg" << endl;
+					sendFlightCommand(0xC2, 0.0, tgt, 0.0);
+					break;
+				case 4:
+					tgt = ((float)rand()/RAND_MAX)*(M_PI/2) - (M_PI/4);
+					cout << "[" << sc_time_stamp() << "] Processor sent roll of " << tgt*180/M_PI << " deg" << endl;
+					sendFlightCommand(0xC2, tgt, 0.0, 0.0);
+					break;
+				case 5:
+					tgt = ((float)rand()/RAND_MAX)*(M_PI/2) - (M_PI/4);
+					tgt2 = ((float)rand()/RAND_MAX)*(M_PI/2) - (M_PI/4);
+					cout << "[" << sc_time_stamp() << "] Processor sent roll/pitch of " << tgt*180/M_PI << " deg, " << tgt2*180/M_PI << " deg"<< endl;
+					sendFlightCommand(0xC2, tgt, tgt2, 0.0);
+					break;
+			}
+			wait(pid_test_period_ms, SC_MS);
 		}
-		message[0] = 0;
-		half = floatToHalf(0);
-		message[1] = half & 0x0F;
-		message[2] = (half >> 8) & 0x0F;
-		half = floatToHalf(0);
-		message[3] = half & 0x0F;
-		message[4] = (half >> 8) & 0x0F;
-		half = floatToHalf(15);
-		message[5] = half & 0x0F;
-		message[6] = (half >> 8) & 0x0F;
-		cout << (int)message[0] << " " << (int)message[5] << " " << (int)message[6] << endl;
-		canif->can_message(20001, message, 7, 0, CAN_NODE);
-
-		while(!canif->can_transmit(1)) //set priority
-		{
-			wait(canFree);
-		}
-		message[0] = 35;
-		half = floatToHalf(0);
-		message[1] = half & 0x0F;
-		message[2] = (half >> 8) & 0x0F;
-		half = floatToHalf(0);
-		message[3] = half & 0x0F;
-		message[4] = (half >> 8) & 0x0F;
-		half = floatToHalf(45*M_PI/180);
-		message[5] = half & 0x0F;
-		message[6] = (half >> 8) & 0x0F;
-		cout << (int)message[0] << " " << (int)message[5] << " " << (int)message[6] << endl;
-		canif->can_message(20001, message, 7, 1, CAN_NODE);
-
-		cout << "[" << sc_time_stamp() << "] Targeting altitude of 15m, yaw rate of 5deg/s" << endl;
-		wait(5000, SC_MS);
-
-		while(!canif->can_transmit(1)) //set priority
-		{
-			wait(canFree);
-		}
-		message[0] = 3;
-		half = floatToHalf(0);
-		message[1] = half & 0x0F;
-		message[2] = (half >> 8) & 0x0F;
-		half = floatToHalf(0);
-		message[3] = half & 0x0F;
-		message[4] = (half >> 8) & 0x0F;
-		half = floatToHalf(4);
-		message[5] = half & 0x0F;
-		message[6] = (half >> 8) & 0x0F;
-		cout << (int)message[0] << " " << (int)message[5] << " " << (int)message[6] << endl;
-		canif->can_message(20001, message, 7, 2, CAN_NODE);
-		cout << "[" << sc_time_stamp() << "] Dropping altitude to 4m" << endl;
-
 		return;
 	}
 
-	void can_monitor()
+	void mainUAVCAN()
 	{
-		while(1)
-		{
-			target = canif->can_listen(msgType, message, length, transfer, source);
-			canFree.notify(SC_ZERO_TIME);
-			if (target == 0)
-			{
-				switch(msgType)
-				{
-				case 20002:
-					//lat
-					temp = (message[3] << 24) & (message[2] << 16) & (message[1] << 8) & message[0];
-					lati = *((float*)&temp);
-					lat_c = transfer;
-					break;
-				case 20003:
-					//long
-					temp = (message[3] << 24) & (message[2] << 16) & (message[1] << 8) & message[0];
-					longi = *((float*)&temp);
-					long_c = transfer;
-					break;
-				case 20004:
-					//alt and more
-					headn = halfToFloat((uint16_t)((message[1] << 8) & message[0]));
-					velo = halfToFloat((uint16_t)((message[3] << 8) & message[2]));
-					altt = halfToFloat((uint16_t)((message[5] << 8) & message[4]));
-					gps_c = transfer;
-					if(lat_c == long_c and long_c == gps_c) {
-						//notify gps update
-					}
-					break;
-				case 20005:
-					//hw interrupt notify
-					break;
-				default:
-					break;
-				}
-			} else if (target == CAN_NODE) {
-				if(tf_wait == msgType)
-				{
-					tf_wait = 0;
-					for(i = 0; i < length; i++)
-					{
-						hw_req[i] = message[i];
-					}
-					//notify response recieved
+		uav_can_msg msg;
+		while(true) {
+			canif->can_listen(msg);
+			if (msg.isBroadcast()) {
+				switch(msg.msgID) {
+					case UAVCAN_GPS_LAT:
+
+						cout << "[" << sc_time_stamp() << "] Processor received GPS Latitude" << endl;
+						msg.unpackFloat32(gps_latitude);
+						break;
+					case UAVCAN_GPS_LONG:
+						cout << "[" << sc_time_stamp() << "] Processor received GPS Longitude" << endl;
+						msg.unpackFloat32(gps_longitude);
+						break;
+					case UAVCAN_GPS_HVA:
+						cout << "[" << sc_time_stamp() << "] Processor received GPS HVA" << endl;
+						msg.unpackFloat16(gps_heading, gps_velocity, gps_altitude);
+						break;
+					default:
+						break;
 				}
 			}
 		}

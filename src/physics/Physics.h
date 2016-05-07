@@ -33,7 +33,6 @@ class PhysicsSim : public sc_module
 {
 private:
 	vector<PhysicsObject*> objects;
-
 	double delta_ms;
 	double sim_time;
 	double time;
@@ -61,7 +60,7 @@ public:
 		this->temperature = STP_TEMP;
 	}
 
-	PhysicsSim(sc_module_name name, double delta_ms) : PhysicsSim(name, delta_ms, 0) {}
+	PhysicsSim(sc_module_name name) : PhysicsSim(name, 1, 20) {}
 
 	void addObject(PhysicsObject* p) {
 		objects.push_back(p);
@@ -69,6 +68,11 @@ public:
 
 	double timeElapsed() {
 		return time;
+	}
+
+	void setTiming(double delta, double tlim) {
+		delta_ms = delta;
+		sim_time = tlim;
 	}
 
 	// Returns pressure in Pa

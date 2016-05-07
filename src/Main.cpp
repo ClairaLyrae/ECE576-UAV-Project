@@ -10,11 +10,10 @@
 #include "physics/PhysicsModules.h"
 #include "physics/PhysicsForces.h"
 #include "util/util.h"
+#include "uavcan/UAVCAN.h"
+#include "uavcan/FrameTypes.h"
 
 using namespace gmtl;
-
-#define PHYSICS_SIM_TIME 20
-#define PHYSICS_STEP_MS 1
 
 // DJI Phantom 3/4 with 2312 motors (960kv) and 9.4x4.5 props
 #define UAV_DRAG_COEFF 2.0
@@ -81,7 +80,7 @@ public:
 		sensor_mag->i2c_slv(*iic_bus);
 		sensor_baro = new LPS22HB("SENSOR_BARO");
 		sensor_baro->i2c_slv(*iic_bus);
-		sensor_gps = new A2235H("SENSOR_GPS");
+		sensor_gps = new A2235H("SENSOR_GPS", 1);
 		sensor_gps->canif(*can_bus);
 
 		// UAV Physics Model
@@ -107,9 +106,8 @@ public:
 		uav->addComponent(sensor_mag);
 
 		// Physics Sim
-		phys = new PhysicsSim("PHYSICS_SIM", PHYSICS_STEP_MS, PHYSICS_SIM_TIME);
+		phys = new PhysicsSim("PHYSICS_SIM");
 		phys->addObject(uav);
-
 
 		// Hardware Accelerator
 		hardware = new FlightController("FLIGHT_CONTROL", phys, uav);
@@ -128,12 +126,39 @@ int sc_main(int argc, char *argv[]) {
 	// Initialize rand
 	srand(time(0));
 
+	double phys_time;
+	double phys_delta;
+	unsigned pid_test;
+	double pid_test_ms;
+
 	// Instantiate modules
 	Top top_inst("TOP");
 
+	// User options
+	cout << "Physics simulation time (s): ";
+	cin >> phys_time;
+	cout << "Physics delta time step (ms): ";
+	cin >> phys_delta;
+	top_inst.phys->setTiming(phys_delta, phys_time);
+	while(true) {
+		cout << "PID control test type (0=altitude, 1=altitude', 2=yaw, 3=roll, 4=pitch, 5=roll/pitch): ";
+		cin >> pid_test;
+		if(pid_test >= 0 && pid_test <= 5)
+			break;
+		cout << "Invalid PID test.";
+	}
+	cout << "PID control test impulse interval (ms): ";
+	cin >> pid_test_ms;
+	top_inst.proc->setPIDTest(pid_test, pid_test_ms);
+
+	cout << "Logging vehicle positioning data to file 'uav_physics_log.txt'" << endl;
+	cout << "Logging vehicle motor input data to file 'uav_motor_log.txt'" << endl;
+
 	// Start simulation
-	cout << "[" << sc_time_stamp() << "] Beginning simulation..." << endl;
+	cout << endl << "[" << sc_time_stamp() << "] Beginning simulation..." << endl;
 	sc_start();
 	cout << "[" << sc_time_stamp() << "] Simulation stopped." << endl;
+
+
 	return 0;
 }
