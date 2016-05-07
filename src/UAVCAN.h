@@ -4,8 +4,6 @@
 #include <systemc.h>
 #include <stdint.h>
 
-#define CAN_SPEED 1000 //ns
-
 /*
 Priorities range from 0 - 31. Lower is higher priority.
 Node ID's range from 1 - 127.
@@ -32,13 +30,15 @@ private:
 	unsigned short dataType;
 	uint8_t contents[7];
 	unsigned i;
+	double period_ns;
 
 public:
 	SC_HAS_PROCESS(uav_can_bus);
 
-	uav_can_bus(sc_module_name name) : sc_module(name)
+	uav_can_bus(sc_module_name name, double freq) : sc_module(name)
 	{
 		SC_THREAD(arbiter);
+		period_ns = (1000000000.0/freq);
 	}
 
 	void JUNK() {
@@ -132,19 +132,19 @@ public:
 			idle = true;
 			canIdle.notify();
 			wait(sof);
-			wait(CAN_SPEED,SC_NS);
+			wait(period_ns,SC_NS);
 			idle = false;
-			wait(34*CAN_SPEED,SC_NS);
+			wait(34*period_ns,SC_NS);
 			priorityCheck.notify();
 			wait(frameLoaded);
-			wait(27*CAN_SPEED,SC_NS);
-			wait(byteCount*8*CAN_SPEED,SC_NS);
-			wait(((61+byteCount*8)/5)*CAN_SPEED,SC_NS); //stuffing estimation
+			wait(27*period_ns,SC_NS);
+			wait(byteCount*8*period_ns,SC_NS);
+			wait(((61+byteCount*8)/5)*period_ns,SC_NS); //stuffing estimation
 			frameReady.notify();
-			wait(10*CAN_SPEED,SC_NS);
+			wait(10*period_ns,SC_NS);
 			interframe = true;
 			canRelease.notify();
-			wait(3*CAN_SPEED,SC_NS);
+			wait(3*period_ns,SC_NS);
 		}
 	}
 

@@ -12,14 +12,10 @@
 #include "SensorData.h"
 #include "gmtl/gmtl.h"
 #include <stdint.h>
-#include "../util/extrause.h"
+#include "../util/util.h"
 
 #define I2C_WRITE false
 #define I2C_READ true
-
-#define PID_ROLL
-#define PID_PITCH
-#define PID_YAW
 
 #define M_PI 3.14159265359
 #define M_PI_2 1.57079632679
@@ -116,8 +112,8 @@ public:
 		SC_THREAD(mainI2C);
 		SC_THREAD(mainIMU);
 		SC_THREAD(mainTimer);
-		//SC_THREAD(mainPilot);
-		SC_THREAD(mainUAVCAN);
+		SC_THREAD(mainPilot);
+		//SC_THREAD(mainUAVCAN);
 
 		this->sim = physim;
 		this->uav = vehicle;
@@ -129,12 +125,12 @@ public:
 		velPID[XAXIS].initialize(20, 20, 0, 20, 0, 0);
 		velPID[YAXIS].initialize(20, 20, 0, 20, 0, 0);
 		velPID[ZAXIS].initialize(20, 20, 0, 20, 0, 0);
-		attPID[ROLL].initialize(6, 1.8, 10, M_PI_2, 0, 0);
-		attPID[PITCH].initialize(6, 1.8, 10, M_PI_2, 0, 0);
-		attPID[YAW].initialize(6, 1.8, 10, M_PI_2, 0, 0);
+		attPID[ROLL].initialize(2, 2, 0, M_PI_2, 0, 0);
+		attPID[PITCH].initialize(2, 2, 0, M_PI_2, 0, 0);
+		attPID[YAW].initialize(2, 2, 0, M_PI_2, 0, 0);
 		ratePID[ROLL].initialize(7, 1, 0, 1, 0, 0);
 		ratePID[PITCH].initialize(7, 1, 0, 1, 0, 0);
-		ratePID[YAW].initialize(7, 1, 0, 1, 0, 0);
+		ratePID[YAW].initialize(7, 1, 0, 0.5, 0, 0);
 		enablePID = true;
 		enablelog = false;
 		cmd.posCmd[XAXIS] = 0;	cmd.posCmd[YAXIS] = 0;	cmd.posCmd[ZAXIS] = 0;
@@ -229,7 +225,7 @@ void FlightController::mainTimer() {
 		}
 		I2C_baro_update = (updateCycle%100 == 0) ? true : false;
 		I2C_acc_gyro_update = (updateCycle%1 == 0) ? true : false;
-		I2C_mag_update = (updateCycle%10 == 0) ? true : false;
+		I2C_mag_update = (updateCycle%100 == 0) ? true : false;
 		if(I2C_mag_update || I2C_acc_gyro_update || I2C_baro_update)
 			timerInterrupt.notify();
 	}
@@ -326,6 +322,7 @@ void FlightController::mainIMU() {
 			// Compute error terms for roll, pitch and yaw from rate, apply to PIDs as feedback
 			error = cmd.rateCmd[ROLL] - attitude_rate[ROLL];
 			ratePID[ROLL].update(error, dt);
+
 			error = cmd.rateCmd[PITCH] + attitude_rate[PITCH];
 			ratePID[PITCH].update(error, dt);
 			error = cmd.rateCmd[YAW] - attitude_rate[YAW];
@@ -356,24 +353,18 @@ void FlightController::mainIMU() {
 			motor[2] = throttleCmd;     // Back right (CW)
 			motor[3] = throttleCmd;     // Back left  (CCW)
 
-		#ifdef PID_ROLL
 			motor[0] += ratePID[ROLL].state;
 			motor[1] += -ratePID[ROLL].state;
 			motor[2] += -ratePID[ROLL].state;
 			motor[3] += ratePID[ROLL].state;
-		#endif
-		#ifdef PID_PITCH
 			motor[0] += -ratePID[PITCH].state;
 			motor[1] += -ratePID[PITCH].state;
 			motor[2] += ratePID[PITCH].state;
 			motor[3] += ratePID[PITCH].state;
-		#endif
-		#ifdef PID_YAW
 			motor[0] += -ratePID[YAW].state;
 			motor[1] += ratePID[YAW].state;
 			motor[2] += -ratePID[YAW].state;
 			motor[3] += ratePID[YAW].state;
-		#endif
 
 		    maxMotor = motor[0];
 		    for (i = 0; i < 4; i++) {
@@ -461,6 +452,73 @@ void FlightController::mainUAVCAN() {
 			}
 		}
 	}
+}
+
+
+// Temporary pilot command generation thread
+void FlightController::mainPilot() {
+	// Initialization
+	enablePID = true;
+	cmd.enableAttPID = true;
+	cmd.enablePosPID = true;
+	unsigned int test = 4;
+	unsigned i;
+	double tgt;
+	srand(time(0));
+	switch(test) {
+	case 0 :
+		cmd.enablePosPID = true;
+		for(i = 0; i < 4; i++) {
+			tgt = round(((float)rand()/RAND_MAX)*30) - 10;
+			cout << "[" << sc_time_stamp() << "] Targeting altitude of " << tgt << "m" << endl;
+			cmd.posCmd[ZAXIS] = tgt;
+			wait(5000, SC_MS);
+		}
+		break;
+	case 1 :
+		cmd.enablePosPID = false;
+		for(i = 0; i < 4; i++) {
+			tgt = ((float)rand()/RAND_MAX)*6.0 - 2;
+			cout << "[" << sc_time_stamp() << "] Targeting vertical velocity of " << tgt << "m/s" << endl;
+			cmd.velCmd[ZAXIS] = tgt;
+			wait(5000, SC_MS);
+		}
+		break;
+	case 2 :
+		cmd.enablePosPID = true;
+		cmd.enableAttPID = true;
+		for(i = 0; i < 4; i++) {
+			tgt = ((float)rand()/RAND_MAX)*M_PI;
+			cout << "[" << sc_time_stamp() << "] Targeting yaw of " << tgt*180/M_PI << "deg" << endl;
+			cmd.attCmd[YAW] = tgt;
+			wait(5000, SC_MS);
+		}
+		break;
+	case 3 :
+		cmd.enablePosPID = true;
+		cmd.enableAttPID = true;
+		for(i = 0; i < 4; i++) {
+			tgt = ((float)rand()/RAND_MAX)*(M_PI/2) - (M_PI/4);
+			cout << "[" << sc_time_stamp() << "] Targeting pitch of " << tgt*180/M_PI << "deg" << endl;
+			cmd.attCmd[PITCH] = tgt;
+			wait(5000, SC_MS);
+		}
+		break;
+	case 4 :
+		cmd.enablePosPID = true;
+		cmd.enableAttPID = true;
+		for(i = 0; i < 4; i++) {
+			tgt = ((float)rand()/RAND_MAX)*(M_PI/2) - (M_PI/4);
+			cout << "[" << sc_time_stamp() << "] Targeting pitch of " << tgt*180/M_PI << "deg" << endl;
+			cmd.attCmd[PITCH] = tgt;
+			tgt = ((float)rand()/RAND_MAX)*(M_PI/2) - (M_PI/4);
+			cout << "[" << sc_time_stamp() << "] Targeting roll of " << tgt*180/M_PI << "deg" << endl;
+			cmd.attCmd[ROLL] = tgt;
+			wait(5000, SC_MS);
+		}
+		break;
+	}
+
 }
 
 #endif

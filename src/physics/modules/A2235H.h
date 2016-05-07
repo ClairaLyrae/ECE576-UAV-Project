@@ -5,7 +5,7 @@
 #include "../Physics.h"
 #include <stdint.h>
 #include "../../UAVCAN.h"
-#include "../../util/extrause.h"
+#include "../../util/util.h"
 
 class A2235H : public PhysicsComponent, public sc_module
 {

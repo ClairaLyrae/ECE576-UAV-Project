@@ -41,19 +41,13 @@ public:
 
 	sc_port<i2c_slv_if> i2c_slv;
 
+	NoiseGenerator anoise;
+	NoiseGenerator gnoise;
+
 	SC_HAS_PROCESS(LSM6DS3);
 
-	LSM6DS3(sc_module_name name) : sc_module(name) {
+	LSM6DS3(sc_module_name name) : sc_module(name), anoise(0, ACC_NOISE_RMS), gnoise(0, GYRO_NOISE_RMS) {
 		SC_THREAD(main);
-		//SC_THREAD(tick);
-	}
-
-	void tick() {
-		while(true) {
-			wait(200, SC_MS);
-			cout << sc_time_stamp() << ":\tLSM6DS3 Gyro = " << gyro_x << ", " << gyro_y << ", " << gyro_z << endl;
-			cout << sc_time_stamp() << ":\tLSM6DS3 Accel = " << acc_x << ", " << acc_y << ", " << acc_z << endl;
-		}
 	}
 
 	void main() {
@@ -90,12 +84,12 @@ public:
 	}
 
 	void update(double delta, PhysicsSim &sim, PhysicsObject &parent) {
-		acc_x = (unsigned long)(parent.acceleration.mData[0]*ACC_SCALE_FACTOR);
-		acc_y = (unsigned long)(parent.acceleration.mData[1]*ACC_SCALE_FACTOR);
-		acc_z = (unsigned long)(parent.acceleration.mData[2]*ACC_SCALE_FACTOR);
-		gyro_x = (unsigned long)(parent.attitude_rate[ROLL]*(180/M_PI)*GYRO_SCALE_FACTOR);
-		gyro_y = (unsigned long)(parent.attitude_rate[PITCH]*(180/M_PI)*GYRO_SCALE_FACTOR);
-		gyro_z = (unsigned long)(parent.attitude_rate[YAW]*(180/M_PI)*GYRO_SCALE_FACTOR);
+		acc_x = (unsigned long)((parent.acceleration.mData[0] + anoise.generate())*ACC_SCALE_FACTOR);
+		acc_y = (unsigned long)((parent.acceleration.mData[1] + anoise.generate())*ACC_SCALE_FACTOR);
+		acc_z = (unsigned long)((parent.acceleration.mData[2] + anoise.generate())*ACC_SCALE_FACTOR);
+		gyro_x = (unsigned long)((parent.attitude_rate[ROLL]*(180/M_PI) + gnoise.generate())*GYRO_SCALE_FACTOR);
+		gyro_y = (unsigned long)((parent.attitude_rate[PITCH]*(180/M_PI) + gnoise.generate())*GYRO_SCALE_FACTOR);
+		gyro_z = (unsigned long)((parent.attitude_rate[YAW]*(180/M_PI) + gnoise.generate())*GYRO_SCALE_FACTOR);
 
 		// Calculated values for register
 		registers[REG_ACC_X_L] = (acc_x) & 0xFF;

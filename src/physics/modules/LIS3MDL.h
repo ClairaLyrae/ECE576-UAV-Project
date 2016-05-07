@@ -27,18 +27,12 @@ public:
 
 	sc_port<i2c_slv_if> i2c_slv;
 
+	NoiseGenerator mnoise;
+
 	SC_HAS_PROCESS(LIS3MDL);
 
-	LIS3MDL(sc_module_name name) : sc_module(name) {
+	LIS3MDL(sc_module_name name) : sc_module(name), mnoise(0, MAG_NOISE_RMS) {
 		SC_THREAD(main);
-		//SC_THREAD(tick);
-	}
-
-	void tick() {
-		while(true) {
-			wait(1000, SC_MS);
-			cout << sc_time_stamp() << ":\tLIS3MDL Mag = " << mag[0] << ", " << mag[1] << ", " << mag[2] << endl;
-		}
 	}
 
 	void main() {
@@ -71,9 +65,9 @@ public:
 
 	void update(double delta, PhysicsSim &sim, PhysicsObject &parent) {
 		// Update sensor data from physics object
-		mag[0] = sim.getMagneticField().mData[0]*MAG_SCALE_FACTOR;
-		mag[1] = sim.getMagneticField().mData[1]*MAG_SCALE_FACTOR;
-		mag[2] = sim.getMagneticField().mData[2]*MAG_SCALE_FACTOR;
+		mag[0] = (sim.getMagneticField().mData[0] + mnoise.generate())*MAG_SCALE_FACTOR;
+		mag[1] = (sim.getMagneticField().mData[1] + mnoise.generate())*MAG_SCALE_FACTOR;
+		mag[2] = (sim.getMagneticField().mData[2] + mnoise.generate())*MAG_SCALE_FACTOR;
 
 		// Set sensor registers to calculated value
 		registers[REG_MAG_X_L] = mag[0] & 0xFF;

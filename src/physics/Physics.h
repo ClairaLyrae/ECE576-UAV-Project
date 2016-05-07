@@ -4,6 +4,7 @@
 #include <systemc.h>
 #include <cmath>
 #include "gmtl/gmtl.h"
+#include "../util/util.h"
 
 using namespace gmtl;
 using namespace std;
@@ -190,28 +191,6 @@ public:
 	~PhysicsObject() {
 		disableLog();
 	}
-
-	Vec3d &toAttitude(Vec3d &result, Quatd &q)
-	{
-	    double q0q0 = q[0]*q[0];
-	    double q0q1 = q[0]*q[1];
-	    double q0q2 = q[0]*q[2];
-	    double q0q3 = q[0]*q[3];
-	    double q1q1 = q[1]*q[1];
-	    double q1q2 = q[1]*q[2];
-	    double q1q3 = q[1]*q[3];
-	    double q2q2 = q[2]*q[2];
-	    double q2q3 = q[2]*q[3];
-	    double q3q3 = q[3]*q[3];
-
-//	    result[ROLL] = atan2(2*(q0q1 + q2q3), q0q0 - q1q1 - q2q2 + q3q3);
-//	    result[PITCH] = -asin(2*(q1q3 - q0q2));
-//	    result[YAW] = atan2(2*(q1q2 + q0q3), q0q0 + q1q1 - q2q2 - q3q3);
-		result[YAW] = atan2(2*(q0q1 + q2q3), q0q0 - q1q1 - q2q2 + q3q3);
-		result[PITCH] = -asin(2*(q1q3 - q0q2));
-		result[ROLL] = atan2(2*(q1q2 + q0q3), q0q0 + q1q1 - q2q2 - q3q3);
-	    return result;
-	}
 };
 
 // Physics Component
@@ -284,10 +263,11 @@ void PhysicsObject::update(double delta, PhysicsSim &sim) {
 		//outfile << time << "\t" << position << "\t" << orientation << "\t" << attitude << "\t" << attitude_rate << endl;
 		outfile << time << "\t";
 		outfile << position[XAXIS] << "\t" << position[YAXIS] << "\t" << position[ZAXIS] << "\t";
-		outfile << orientation_vec_up[XAXIS] << "\t" << orientation_vec_up[YAXIS] << "\t" << orientation_vec_up[ZAXIS] << "\t";
-		outfile << orientation_vec_forward[XAXIS] << "\t" << orientation_vec_forward[YAXIS] << "\t" << orientation_vec_forward[ZAXIS] << "\t";
+		outfile << velocity[XAXIS] << "\t" << velocity[YAXIS] << "\t" << velocity[ZAXIS] << "\t";
 		outfile << attitude[ROLL] << "\t" << attitude[PITCH] << "\t" << attitude[YAW] << "\t";
 		outfile << attitude_rate[ROLL] << "\t" << attitude_rate[PITCH] << "\t" << attitude_rate[YAW] << "\t";
+		outfile << orientation_vec_up[XAXIS] << "\t" << orientation_vec_up[YAXIS] << "\t" << orientation_vec_up[ZAXIS] << "\t";
+		outfile << orientation_vec_forward[XAXIS] << "\t" << orientation_vec_forward[YAXIS] << "\t" << orientation_vec_forward[ZAXIS] << "\t";
 		outfile << endl;
 	}
 	time += delta;	// Update total time elapsed

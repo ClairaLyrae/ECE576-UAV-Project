@@ -2,10 +2,11 @@
 data = importdata('../uav_physics_log.txt');
 t=data(1:100:end,1);
 r=data(1:100:end,2:4);
-n=data(1:100:end,5:7);
-f=data(1:100:end,8:10);
-att=data(1:100:end,11:13);
-attr=data(1:100:end,14:16);
+v=data(1:100:end,5:7);
+att=data(1:100:end,8:10);
+attr=data(1:100:end,11:13);
+n=data(1:100:end,14:16);
+f=data(1:100:end,17:19);
 
 % Plot figure
 figure(1);

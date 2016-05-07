@@ -21,7 +21,7 @@ public:
 		srand(time(0));
 		while(1)
 		{
-			wait(rand() % wait_var + wait_min,SC_NS);
+			wait(rand() % wait_var + wait_min, SC_NS);
 			while(!canif->can_transmit(priority))
 			{
 				target = canif->can_listen(msgType, message, length, transfer, source);
@@ -39,4 +39,4 @@ private:
 };
 
 
-#endif /* FRAMEGENERATOR_H_ */
+#endif

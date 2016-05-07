@@ -9,6 +9,7 @@
 #include "physics/Physics.h"
 #include "physics/PhysicsModules.h"
 #include "physics/PhysicsForces.h"
+#include "util/util.h"
 
 using namespace gmtl;
 
@@ -26,8 +27,10 @@ using namespace gmtl;
 #define UAV_MOTOR_RPM 11592
 #define UAV_MOTOR_TORQUE 0.181232337
 
+// Bus settings
 #define I2C_CLK_FREQ 400000
 #define PWM_CLK_FREQ 1000
+#define UAVCAN_CLK_FREQ 1000000
 
 // Top Module
 class Top : public sc_module
@@ -58,7 +61,7 @@ public:
 	Top(sc_module_name name) : sc_module(name)
 	{
 		// CAN Bus
-		can_bus = new uav_can_bus("CAN_BUS");
+		can_bus = new uav_can_bus("CAN_BUS", UAVCAN_CLK_FREQ);
 
 		// I2C Bus
 		iic_bus = new i2c_bus("I2C_BUS", I2C_CLK_FREQ);
@@ -122,15 +125,15 @@ public:
 
 // System C Main
 int sc_main(int argc, char *argv[]) {
-
+	// Initialize rand
+	srand(time(0));
 
 	// Instantiate modules
 	Top top_inst("TOP");
 
 	// Start simulation
-	cout << "Beginning simulation...\n" << endl;
+	cout << "[" << sc_time_stamp() << "] Beginning simulation..." << endl;
 	sc_start();
-	cout << "\nSimulation stopped." << endl;
-
+	cout << "[" << sc_time_stamp() << "] Simulation stopped." << endl;
 	return 0;
 }

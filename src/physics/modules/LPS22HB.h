@@ -4,11 +4,13 @@
 #include <systemc.h>
 #include "../Physics.h"
 #include "../../I2C.h"
+#include "../../util/util.h"
 #include <stdint.h>
 
 class LPS22HB : public PhysicsComponent, public sc_module
 {
 private:
+	double temp_err, press_err;
 	uint32_t pressure;
 	uint16_t temperature;
 	uint8_t registers[128];
@@ -32,19 +34,13 @@ public:
 
 	sc_port<i2c_slv_if> i2c_slv;
 
+	NoiseGenerator tnoise;
+	NoiseGenerator pnoise;
+
 	SC_HAS_PROCESS(LPS22HB);
 
-	LPS22HB(sc_module_name name) : sc_module(name) {
+	LPS22HB(sc_module_name name) : sc_module(name), tnoise(0, TEMP_NOISE_RMS), pnoise(0, PRESS_NOISE_RMS) {
 		SC_THREAD(main);
-		//SC_THREAD(tick);
-	}
-
-	void tick() {
-		while(true) {
-			wait(100, SC_MS);
-			cout << sc_time_stamp() << ":\tLPS22HB Pressure = " << pressure << " (" << registers[REG_PRES_XL] << ", " << registers[REG_PRES_L] << ", " << registers[REG_PRES_H] << ")" << endl;
-			cout << sc_time_stamp() << ":\tLPS22HB Temp = " << temperature << " (" << registers[REG_TEMP_L] << ", " << registers[REG_TEMP_H] << ")" << endl;
-		}
 	}
 
 	void main() {
@@ -77,8 +73,8 @@ public:
 
 	void update(double delta, PhysicsSim &sim, PhysicsObject &parent) {
 		// Update sensor data from physics object
-		pressure = sim.getPressure(parent.position.mData[2])*PRESS_SCALE_FACTOR;
-		temperature = (sim.getTemperature(parent.position.mData[2]) - 273.15)*PRESS_SCALE_FACTOR;
+		pressure = (sim.getPressure(parent.position.mData[2]) + pnoise.generate())*PRESS_SCALE_FACTOR;
+		temperature = (sim.getTemperature(parent.position.mData[2]) - 273.15 + tnoise.generate())*PRESS_SCALE_FACTOR;
 
 		// Set sensor registers to calculated value
 		registers[REG_PRES_XL] = pressure & 0xFF;

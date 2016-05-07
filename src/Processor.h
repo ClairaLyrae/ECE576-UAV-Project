@@ -6,7 +6,7 @@
 #include <systemc.h>
 #include <stdint.h>
 #include "UAVCAN.h"
-#include "util/extrause.h"
+#include "util/util.h"
 
 // Processor Module
 class Processor : public sc_module
@@ -33,8 +33,8 @@ public:
 	sc_event canFree;
 
 	Processor(sc_module_name name) : sc_module(name) {
-		SC_THREAD(main);
-		SC_THREAD(can_monitor);
+		//SC_THREAD(main);
+		//SC_THREAD(can_monitor);
 	}
 
 	void main() {
