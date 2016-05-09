@@ -1,0 +1,19 @@
+#################################################
+# UAV Simulation Program Example
+#################################################
+
+# Set the flight mode flags (attitude PID, pos PID, lateral pos PID, N/A)
+mode 1,1,0,0
+# Sent a blank command (to update flags)
+pos 0,0,0
+# Wait for 1000ms
+wait 1000
+# Send a position change command to move to 10m altitude
+pos 0,0,10
+# Wait for 1000ms
+wait 1000
+# Send a position change command to move down to 5m altitude
+pos 0,0,5
+
+
+	

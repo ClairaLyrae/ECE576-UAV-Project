@@ -12,8 +12,10 @@
 #include "util/util.h"
 #include "uavcan/UAVCAN.h"
 #include "uavcan/FrameTypes.h"
+#include "Config.h"
 
 using namespace gmtl;
+using namespace std;
 
 // DJI Phantom 3/4 with 2312 motors (960kv) and 9.4x4.5 props
 #define UAV_DRAG_COEFF 2.0
@@ -21,10 +23,6 @@ using namespace gmtl;
 #define UAV_LENGTH 	0.248
 #define UAV_WIDTH 	0.248
 #define UAV_HEIGHT 	0.2
-#define UAV_PROP_DIAMETER 0.23876
-#define UAV_PROP_PITCH 0.1143
-#define UAV_MOTOR_RPM 11592
-#define UAV_MOTOR_TORQUE 0.181232337
 
 // Bus settings
 #define I2C_CLK_FREQ 400000
@@ -84,23 +82,21 @@ public:
 		sensor_gps->canif(*can_bus);
 
 		// UAV Physics Model
-		uav = new PhysicsObject(UAV_MASS, UAV_LENGTH, UAV_WIDTH, UAV_HEIGHT);
-		motor_1 = new Motor("MOTOR_1", Vec3d(UAV_LENGTH/2, UAV_LENGTH/2, 0), UAV_PROP_DIAMETER, UAV_PROP_PITCH, UAV_MOTOR_RPM, UAV_MOTOR_TORQUE, true);
-		motor_2 = new Motor("MOTOR_2", Vec3d(UAV_LENGTH/2, -UAV_LENGTH/2, 0), UAV_PROP_DIAMETER, UAV_PROP_PITCH, UAV_MOTOR_RPM, UAV_MOTOR_TORQUE,false);
-		motor_3 = new Motor("MOTOR_3", Vec3d(-UAV_LENGTH/2, -UAV_LENGTH/2, 0), UAV_PROP_DIAMETER, UAV_PROP_PITCH, UAV_MOTOR_RPM, UAV_MOTOR_TORQUE,true);
-		motor_4 = new Motor("MOTOR_4", Vec3d(-UAV_LENGTH/2, UAV_LENGTH/2, 0), UAV_PROP_DIAMETER, UAV_PROP_PITCH, UAV_MOTOR_RPM, UAV_MOTOR_TORQUE,false);
+		uav = new PhysicsObject(UAV_MASS, UAV_DRAG_COEFF, UAV_LENGTH, UAV_WIDTH, UAV_HEIGHT);
+		motor_1 = new Motor("MOTOR_1", Vec3d(UAV_LENGTH/2, UAV_LENGTH/2, 0), true);
+		motor_2 = new Motor("MOTOR_2", Vec3d(UAV_LENGTH/2, -UAV_LENGTH/2, 0), false);
+		motor_3 = new Motor("MOTOR_3", Vec3d(-UAV_LENGTH/2, -UAV_LENGTH/2, 0), true);
+		motor_4 = new Motor("MOTOR_4", Vec3d(-UAV_LENGTH/2, UAV_LENGTH/2, 0), false);
 		motor_1->pwm_in(*pwm_bus_1);
 		motor_2->pwm_in(*pwm_bus_2);
 		motor_3->pwm_in(*pwm_bus_3);
 		motor_4->pwm_in(*pwm_bus_4);
-		aeromodel = new Aerodynamics(UAV_DRAG_COEFF);
+		aeromodel = new Aerodynamics();
 		uav->addComponent(motor_1);
 		uav->addComponent(motor_2);
 		uav->addComponent(motor_3);
 		uav->addComponent(motor_4);
 		uav->addComponent(aeromodel);
-		uav->enableLog("uav_physics_log.txt");
-		uav->position.set(0,0,10);
 		uav->addComponent(sensor_baro);
 		uav->addComponent(sensor_acc_gyro);
 		uav->addComponent(sensor_mag);
@@ -116,48 +112,113 @@ public:
 		hardware->pwm_out_2(*pwm_bus_2);
 		hardware->pwm_out_3(*pwm_bus_3);
 		hardware->pwm_out_4(*pwm_bus_4);
-		hardware->enableLog("uav_motor_log.txt");
 		hardware->canif(*can_bus);
 	}
 };
 
 // System C Main
 int sc_main(int argc, char *argv[]) {
+	Config conf;
+	string cfilename = "config.txt";
+
 	// Initialize rand
 	srand(time(0));
-
-	double phys_time;
-	double phys_delta;
-	unsigned pid_test;
-	double pid_test_ms;
 
 	// Instantiate modules
 	Top top_inst("TOP");
 
-	// User options
-	cout << "Physics simulation time (s): ";
-	cin >> phys_time;
-	cout << "Physics delta time step (ms): ";
-	cin >> phys_delta;
-	top_inst.phys->setTiming(phys_delta, phys_time);
-	while(true) {
-		cout << "PID control test type (0=altitude, 1=altitude', 2=yaw, 3=roll, 4=pitch, 5=roll/pitch): ";
-		cin >> pid_test;
-		if(pid_test >= 0 && pid_test <= 5)
-			break;
-		cout << "Invalid PID test.";
+	// Load configuration file
+	if(argc > 1)
+		cfilename = argv[1];
+	cout << "Loading configuration file from '" << cfilename << "'..." << endl;
+	if(!conf.load(cfilename)) {
+		cout << "Count not load configuration file" << endl;
+		return 0;
 	}
-	cout << "PID control test impulse interval (ms): ";
-	cin >> pid_test_ms;
-	top_inst.proc->setPIDTest(pid_test, pid_test_ms);
 
-	cout << "Logging vehicle positioning data to file 'uav_physics_log.txt'" << endl;
-	cout << "Logging vehicle motor input data to file 'uav_motor_log.txt'" << endl;
+	// Load PID configs
+	double pid[6];
+	conf.getDouble("pid_att_roll", pid, 6);
+	top_inst.hardware->attPID[ROLL].initialize(pid[0], pid[1], pid[2], pid[3], pid[4], pid[5]);
+	// cout << "Attitude roll PID set to [" << pid[0] << ", " << pid[1] << ", " << pid[2] << "]" << endl;
+	conf.getDouble("pid_att_pitch", pid, 6);
+	top_inst.hardware->attPID[PITCH].initialize(pid[0], pid[1], pid[2], pid[3], pid[4], pid[5]);
+	// cout << "Attitude pitch PID set to [" << pid[0] << ", " << pid[1] << ", " << pid[2] << "]" << endl;
+	conf.getDouble("pid_att_yaw", pid, 6);
+	top_inst.hardware->attPID[YAW].initialize(pid[0], pid[1], pid[2], pid[3], pid[4], pid[5]);
+	// cout << "Attitude yaw PID set to [" << pid[0] << ", " << pid[1] << ", " << pid[2] << "]" << endl;
+	conf.getDouble("pid_rate_roll", pid, 6);
+	top_inst.hardware->ratePID[ROLL].initialize(pid[0], pid[1], pid[2], pid[3], pid[4], pid[5]);
+	// cout << "Rate roll PID set to [" << pid[0] << ", " << pid[1] << ", " << pid[2] << "]" << endl;
+	conf.getDouble("pid_rate_pitch", pid, 6);
+	top_inst.hardware->ratePID[PITCH].initialize(pid[0], pid[1], pid[2], pid[3], pid[4], pid[5]);
+	// cout << "Rate pitch PID set to [" << pid[0] << ", " << pid[1] << ", " << pid[2] << "]" << endl;
+	conf.getDouble("pid_rate_yaw", pid, 6);
+	top_inst.hardware->ratePID[YAW].initialize(pid[0], pid[1], pid[2], pid[3], pid[4], pid[5]);
+	// cout << "Rate yaw PID set to [" << pid[0] << ", " << pid[1] << ", " << pid[2] << "]" << endl;
+	conf.getDouble("pid_pos_x", pid, 6);
+	top_inst.hardware->posPID[XAXIS].initialize(pid[0], pid[1], pid[2], pid[3], pid[4], pid[5]);
+	// cout << "Position X PID set to [" << pid[0] << ", " << pid[1] << ", " << pid[2] << "]" << endl;
+	conf.getDouble("pid_pos_y", pid, 6);
+	top_inst.hardware->posPID[YAXIS].initialize(pid[0], pid[1], pid[2], pid[3], pid[4], pid[5]);
+	// cout << "Position Y PID set to [" << pid[0] << ", " << pid[1] << ", " << pid[2] << "]" << endl;
+	conf.getDouble("pid_pos_z", pid, 6);
+	top_inst.hardware->posPID[ZAXIS].initialize(pid[0], pid[1], pid[2], pid[3], pid[4], pid[5]);
+	// cout << "Position Z PID set to [" << pid[0] << ", " << pid[1] << ", " << pid[2] << "]" << endl;
+	conf.getDouble("pid_vel_x", pid, 6);
+	top_inst.hardware->velPID[XAXIS].initialize(pid[0], pid[1], pid[2], pid[3], pid[4], pid[5]);
+	// cout << "Velocity X PID set to [" << pid[0] << ", " << pid[1] << ", " << pid[2] << "]" << endl;
+	conf.getDouble("pid_vel_y", pid, 6);
+	top_inst.hardware->velPID[YAXIS].initialize(pid[0], pid[1], pid[2], pid[3], pid[4], pid[5]);
+	// cout << "Velocity Y PID set to [" << pid[0] << ", " << pid[1] << ", " << pid[2] << "]" << endl;
+	conf.getDouble("pid_vel_z", pid, 6);
+	top_inst.hardware->velPID[ZAXIS].initialize(pid[0], pid[1], pid[2], pid[3], pid[4], pid[5]);
+	// cout << "Velocity Z PID set to [" << pid[0] << ", " << pid[1] << ", " << pid[2] << "]" << endl;
+
+	// Set options
+	top_inst.phys->setTiming(conf.getDouble("physics_sim_delta"), conf.getDouble("physics_sim_time"));
+	if(conf.getBool("log_motor_enable"))
+		top_inst.hardware->enableLog(conf.getString("log_motor_file"));
+	if(conf.getBool("log_physics_enable"))
+		top_inst.uav->enableLog(conf.getString("log_physics_file"));
+	top_inst.iic_bus->setFrequency(conf.getDouble("i2c_bus_frequency"));
+	top_inst.can_bus->setFrequency(conf.getDouble("uavcan_bus_frequency"));
+	top_inst.hardware->setMagRate(conf.getDouble("mag_read_rate"));
+	top_inst.hardware->setAccGyroRate(conf.getDouble("acc_gyro_read_rate"));
+	top_inst.hardware->setBaroRate(conf.getDouble("baro_read_rate"));
+	top_inst.sensor_gps->setBroadcastRate(conf.getDouble("gps_broadcast_rate"));
+	top_inst.sensor_gps->enableBroadcast(conf.getBool("gps_broadcast_enable"));
+	top_inst.proc->setFlightTest(conf.getInt("flight_test_type"), conf.getDouble("flight_test_interval"));
+	top_inst.can_bus->showTraffic(conf.getBool("uavcan_show_traffic"));
+	top_inst.iic_bus->showTraffic(conf.getBool("i2c_show_traffic"));
+	if(conf.getBool("flight_test_program_enable")) {
+		top_inst.proc->enableProgram(conf.getString("flight_test_program_file"));
+	}
+	top_inst.proc->showCommands(conf.getBool("flight_test_verbose"));
+
+
+	top_inst.uav->mass = conf.getDouble("uav_mass");
+	top_inst.uav->drag_coeff = conf.getDouble("uav_drag_coeff");
+	top_inst.uav->position.set(0,0,conf.getDouble("uav_initial_height"));
+	top_inst.motor_1->setPropeller(conf.getDouble("uav_prop_diameter"), conf.getDouble("uav_prop_pitch"));
+	top_inst.motor_1->setMotorLimits(conf.getDouble("uav_motor_max_rpm"), conf.getDouble("uav_motor_max_torque"));
+	top_inst.motor_2->setPropeller(conf.getDouble("uav_prop_diameter"), conf.getDouble("uav_prop_pitch"));
+	top_inst.motor_2->setMotorLimits(conf.getDouble("uav_motor_max_rpm"), conf.getDouble("uav_motor_max_torque"));
+	top_inst.motor_3->setPropeller(conf.getDouble("uav_prop_diameter"), conf.getDouble("uav_prop_pitch"));
+	top_inst.motor_3->setMotorLimits(conf.getDouble("uav_motor_max_rpm"), conf.getDouble("uav_motor_max_torque"));
+	top_inst.motor_4->setPropeller(conf.getDouble("uav_prop_diameter"), conf.getDouble("uav_prop_pitch"));
+	top_inst.motor_4->setMotorLimits(conf.getDouble("uav_motor_max_rpm"), conf.getDouble("uav_motor_max_torque"));
 
 	// Start simulation
-	cout << endl << "[" << sc_time_stamp() << "] Beginning simulation..." << endl;
+	cout << "Beginning simulation..." << endl << endl;
 	sc_start();
 	cout << "[" << sc_time_stamp() << "] Simulation stopped." << endl;
+
+	top_inst.uav->disableLog();
+	top_inst.hardware->disableLog();
+	top_inst.proc->disableProgram();
+
+
 
 
 	return 0;

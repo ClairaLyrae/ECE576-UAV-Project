@@ -71,7 +71,7 @@ public:
 	}
 
 	void setTiming(double delta, double tlim) {
-		delta_ms = delta;
+		delta_ms = 1000*delta;
 		sim_time = tlim;
 	}
 
@@ -136,6 +136,7 @@ public:
 
 	double dimensions[3];
 	double mass;
+	double drag_coeff;
 
 	// Force components
 	Vec3d force;
@@ -143,8 +144,9 @@ public:
 
 	vector<PhysicsComponent*> components;
 
-	PhysicsObject(double mass, float length, float width, float height) {
+	PhysicsObject(double mass, double drag_coeff, float length, float width, float height) {
 		this->mass = mass;
+		this->drag_coeff = drag_coeff;
 		this->enablelog = false;
 		this->time = 0;
 		this->dimensions[0] = length;
@@ -170,17 +172,18 @@ public:
 
 	bool enableLog(string ofile) {
 		this->outfilename = ofile;
+		outfile.close();
     	outfile.open(outfilename.c_str());
 		enablelog = true;
 		if(!outfile.good()) {
 			enablelog = false;
+			cout << outfilename.c_str() << " : LOG IS BAD pph" << outfile.eof() << outfile.fail() <<  outfile.bad() << endl;
 		}
 		return enablelog;
 	}
 
 	void disableLog() {
 		if(enablelog) {
-			outfile.flush();
 			outfile.close();
 		}
 		enablelog = false;
@@ -208,17 +211,20 @@ public:
 
 
 void PhysicsSim::main() {
+	unsigned counter;
 	while(sim_time == 0 || time < sim_time) {
 		wait(delta_ms, SC_MS);
 		for(PhysicsObject* p : objects) {
 			p->update(delta_ms*0.001, *this);
 		}
+		counter++;
+		if(counter == (unsigned)(1000.0/delta_ms)) {
+			counter = 0;
+			cout << "[" << sc_time_stamp() << "]" << endl;
+		}
 		time += delta_ms*0.001;
-		if((int)(time*1000)%1000 == 0)
-			cout << "Physics time (t=" << time << "s)" << endl;
 		event_sim_delta.notify();
 	}
-	cout << "Physics simulation end (t=" << time << "s)" << endl;
 	sc_stop();
 	return;
 }
@@ -264,7 +270,6 @@ void PhysicsObject::update(double delta, PhysicsSim &sim) {
 
 	// Log physics state
 	if(enablelog) {
-		//outfile << time << "\t" << position << "\t" << orientation << "\t" << attitude << "\t" << attitude_rate << endl;
 		outfile << time << "\t";
 		outfile << position[XAXIS] << "\t" << position[YAXIS] << "\t" << position[ZAXIS] << "\t";
 		outfile << velocity[XAXIS] << "\t" << velocity[YAXIS] << "\t" << velocity[ZAXIS] << "\t";

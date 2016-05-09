@@ -33,6 +33,7 @@ private:
 	bool rdnwr;
 	sc_mutex i2c_active;
 	uint8_t period_ns;
+	bool display;
 
 	void i2c_start(uint8_t addr, bool rw)
 	{
@@ -59,15 +60,26 @@ public:
 
 	i2c_bus(sc_module_name name, double freq) : sc_module(name)
 	{
-		period_ns = 1000000000.0/freq;
+		setFrequency(freq);
 		transfer = 0;
 		dest = 0;
 		end = 0;
 		rdnwr = false;
+		display = false;
+	}
+
+	void setFrequency(double freq) {
+		period_ns = (1000000000.0/freq);
+	}
+
+	void showTraffic(bool b) {
+		display = b;
 	}
 
 	void i2c_write(uint8_t addr, uint8_t reg, uint8_t len, uint8_t *data) {
 		uint8_t i = 0;
+		if(display)
+			cout << "[" << sc_time_stamp() << "] I2C write to (add=" << addr << ", reg=" << reg << ")" << endl;
 		i2c_start(addr, I2C_WRITE);
 		mst_i2c_send(reg, true);
 		for(i = 0; i < len; i++) {
@@ -79,6 +91,8 @@ public:
 
 	void i2c_read(uint8_t addr, uint8_t reg, uint8_t len, uint8_t *data) {
 		uint8_t i = 0;
+		if(display)
+			cout << "[" << sc_time_stamp() << "] I2C read from (add=" << (unsigned)addr << ", reg=" << (unsigned)reg << ")" << endl;
 		i2c_start(addr, I2C_WRITE);
 		mst_i2c_send(reg, true);
 		i2c_continue(addr, I2C_READ);

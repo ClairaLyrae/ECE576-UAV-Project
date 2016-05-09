@@ -13,6 +13,11 @@ using namespace std;
 #define M_PI 3.14159265359
 #define M_PI_4 0.78539816339
 
+#define PROP_DIAMETER 0.23876
+#define PROP_PITCH 0.1143
+#define MOTOR_RPM 11592
+#define MOTOR_TORQUE 0.181232337
+
 class Motor : public PhysicsComponent, public sc_module
 {
 public:
@@ -28,15 +33,29 @@ public:
 
 	SC_HAS_PROCESS(Motor);
 
-	Motor(sc_module_name name, Vec3d position, double propDiameter, double propPitch, double maxRPM, double maxTorque, bool cw) : sc_module(name) {
+	Motor(sc_module_name name, Vec3d position, bool cw) : sc_module(name) {
 		SC_THREAD(main);
 		this->position = position;
-		this->propPitch = propPitch;
-		this->propDiameter = propDiameter;
-		this->maxRPS = maxRPM/60.0;
-		this->thrustLevel = 0;
+		propPitch = PROP_PITCH;
+		propDiameter = PROP_DIAMETER;
+		maxRPS = MOTOR_RPM/60.0;
+		thrustLevel = 0;
+		stallTorque = MOTOR_TORQUE;
 		this->cw = cw;
-		this->stallTorque = maxTorque;
+	}
+
+	void setPropeller(double dia, double pitch) {
+		propPitch = pitch;
+		propDiameter = dia;
+	}
+
+	void setMotorLimits(double rpm, double torque) {
+		maxRPS = rpm/60.0;
+		stallTorque = torque;
+	}
+
+	void setMotorDirection(bool clockwise) {
+		cw = clockwise;
 	}
 
 	void main() {

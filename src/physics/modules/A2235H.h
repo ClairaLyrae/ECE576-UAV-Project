@@ -20,11 +20,12 @@ class A2235H : public PhysicsComponent, public sc_module
 {
 private:
 	unsigned registers[128];
+	bool enBroadcast;
 public:
 	static const unsigned char CAN_NODE = 3;
 	static const unsigned char CAN_PRIORITY = 10;
 	float longitude, latitude, heading, altitude, velocity;
-	float period_ms;
+	double period_ms;
 
 	sc_port<uav_can_if> canif;
 
@@ -34,7 +35,16 @@ public:
 		SC_THREAD(main);
 		latitude = GPS_LATITUDE;
 		longitude = GPS_LONGITUDE;
+		setBroadcastRate(broadcastRate);
+		enBroadcast = true;
+	}
+
+	void setBroadcastRate(double broadcastRate) {
 		period_ms = 1000.0/broadcastRate;
+	}
+
+	void enableBroadcast(bool b) {
+		enBroadcast = b;
 	}
 
 	void main() {
@@ -42,15 +52,13 @@ public:
 		uav_can_msg msg;
 
 		// Continuous broadcasting at fixed rate
-		while(true) {
-			wait(period_ms,SC_MS);
+		while(enBroadcast) {
 
 			// Broadcast latitiude
 			while(!canif->can_transmit(CAN_PRIORITY))
 				canif->can_listen(msg);
 			msg.set(20002, broadcastCount, CAN_NODE, 0);
 			msg.packFloat32(latitude);
-			cout << "[" << sc_time_stamp() << "] GPS broadcast latitude: " << latitude << endl;
 			canif->can_message(msg);
 
 			// Broadcast longitude
@@ -58,7 +66,6 @@ public:
 				canif->can_listen(msg);
 			msg.set(20003, broadcastCount, CAN_NODE, 0);
 			msg.packFloat32(longitude);
-			cout << "[" << sc_time_stamp() << "] GPS broadcast longitude: " << longitude << endl;
 			canif->can_message(msg);
 
 			// Broadcast heading, velocity, altitude
@@ -66,10 +73,11 @@ public:
 				canif->can_listen(msg);
 			msg.set(20004, broadcastCount, CAN_NODE, 0);
 			msg.packFloat16(heading, velocity, altitude);
-			cout << "[" << sc_time_stamp() << "] GPS broadcast HVA" << endl;
 			canif->can_message(msg);
 
 			broadcastCount++;
+
+			wait(period_ms, SC_MS);
 		}
 	}
 

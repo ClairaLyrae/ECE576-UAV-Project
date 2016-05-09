@@ -1,0 +1,66 @@
+#################################################
+# UAV Simulation Configuration File
+#################################################
+
+# Physics simulation timing (s)
+physics_sim_time = 20
+physics_sim_delta = 0.0001
+
+# UAV Settings
+uav_end_on_crash = true
+uav_initial_height = 10.0
+uav_mass = 1.28
+uav_drag_coeff = 2.0
+uav_prop_diameter = 0.23876
+uav_prop_pitch = 0.1143
+uav_motor_max_rpm = 11592
+uav_motor_max_torque = 0.181232337
+
+# UAVCAN bus
+uavcan_bus_frequency = 1000000
+uavcan_traffic_enable = true
+uavcan_show_traffic = true
+
+# I2C bus
+i2c_bus_frequency = 400000
+i2c_show_traffic = false
+
+# Sensor settings
+gps_broadcast_enable = true
+gps_broadcast_rate = 1
+# These correspond to the rate that the sensors are read by the flight controller
+acc_gyro_read_rate = 1000
+baro_read_rate = 10
+mag_read_rate = 100
+
+# PID settings (P, I, D, limit, filter state, integrator state)
+pid_att_roll = 2,2,0,1.5707,0,0
+pid_att_pitch = 2,2,0,1.5707,0,0
+pid_att_yaw = 2,2,0,1.5707,0,0
+pid_rate_roll = 7,1,0,1,0,0
+pid_rate_pitch = 7,1,0,1,0,0
+pid_rate_yaw = 12,1,0,1,0,0
+pid_pos_x = 20,20,0,20,0,0
+pid_pos_y = 20,20,0,20,0,0
+pid_pos_z = 20,20,0,20,0,0
+pid_vel_x = 4,1,0,0.785,0,0
+pid_vel_y = 4,1,0,0.785,0,0
+pid_vel_z = 4,1,0,0.785,0,0
+
+# Processor commands
+flight_test_verbose = true
+# This is a set of default tests for flight (0=none, 1=altitude, 2=vertical speed, 3=roll, 4=pitch, 5=yaw, 6=roll/pitch)
+# All tests are a series of impulsive changes at the interval given by flight_test_interval
+flight_test_type = 6
+flight_test_interval = 5
+# These options allow you to use an optional program file for flight test (see program.txt for example)
+# When enabled, the standard pre-programmed test sequences will not run
+flight_test_program_enable = true
+flight_test_program_file = program_square.txt
+
+# Logging (tab delimited)
+log_physics_enable = true
+log_physics_file = uav_physics_log.txt
+log_motor_enable = true
+log_motor_file = uav_motor_log.txt
+	

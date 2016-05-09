@@ -67,6 +67,20 @@ private:
 	ofstream outfile;
 	string outfilename;
 	bool enablelog;
+
+	// Interrupt System
+	sc_event timerInterrupt;
+	bool I2C_mag_update;
+	bool I2C_acc_gyro_update;
+	bool I2C_baro_update;
+	int I2C_mag_interval_ms;
+	int I2C_acc_gyro_interval_ms;
+	int I2C_baro_interval_ms;
+
+	double AHRS_interval_ms;
+
+	PhysicsSim *sim;
+	PhysicsObject *uav;
 public:
 	static const unsigned char CAN_NODE = 2;
 
@@ -80,6 +94,7 @@ public:
 
 	// Motor output values
 	double motor[4];
+
 
 	// Sensor/Command data
 	Sensors sensor;
@@ -100,15 +115,6 @@ public:
 	PID ratePID[3];
 	PID posPID[3];
 	PID velPID[3];
-
-	// Interrupt System
-	sc_event timerInterrupt;
-	bool I2C_mag_update;
-	bool I2C_acc_gyro_update;
-	bool I2C_baro_update;
-
-	PhysicsSim *sim;
-	PhysicsObject *uav;
 
 	SC_HAS_PROCESS(FlightController);
 
@@ -140,6 +146,10 @@ public:
 		cmd.posCmd[XAXIS] = 0;	cmd.posCmd[YAXIS] = 0;	cmd.posCmd[ZAXIS] = 0;
 		cmd.attCmd[ROLL] = 0;	cmd.attCmd[PITCH] = 0;	cmd.attCmd[YAW] = 0;
 		cmd.rateCmd[ROLL] = 0;	cmd.rateCmd[PITCH] = 0;	cmd.rateCmd[YAW] = 0;
+		AHRS_interval_ms = 1;
+		I2C_baro_interval_ms = 100;
+		I2C_acc_gyro_interval_ms = 1;
+		I2C_mag_interval_ms = 10;
 	}
 
 	void mainIMU();
@@ -147,6 +157,16 @@ public:
 	void mainI2C();
 	void mainTimer();
 	void mainUAVCAN();
+
+	void setMagRate(double rate) {
+		I2C_mag_interval_ms = (int)(1000.0/rate);
+	}
+	void setAccGyroRate(double rate) {
+		I2C_acc_gyro_interval_ms = (int)(1000.0/rate);
+	}
+	void setBaroRate(double rate) {
+		I2C_baro_interval_ms = (int)(1000.0/rate);
+	}
 
 	void setThrottle(double m1, double m2, double m3, double m4) {
 		motor[0] = m1;
@@ -227,9 +247,9 @@ void FlightController::mainTimer() {
 			cout << "[" << sc_time_stamp() << "] I2C Bus error: unserviced request" << endl;
 			sc_stop();
 		}
-		I2C_baro_update = (updateCycle%100 == 0) ? true : false;
-		I2C_acc_gyro_update = (updateCycle%1 == 0) ? true : false;
-		I2C_mag_update = (updateCycle%100 == 0) ? true : false;
+		I2C_baro_update = (updateCycle%I2C_baro_interval_ms == 0) ? true : false;
+		I2C_acc_gyro_update = (updateCycle%I2C_acc_gyro_interval_ms == 0) ? true : false;
+		I2C_mag_update = (updateCycle%I2C_mag_interval_ms == 0) ? true : false;
 		if(I2C_mag_update || I2C_acc_gyro_update || I2C_baro_update)
 			timerInterrupt.notify();
 	}
@@ -294,10 +314,11 @@ void FlightController::mainIMU() {
 	double tempAttCompensationPitch, tempAttCompensationRoll;
 	unsigned i;
 	double maxMotor;
+	double dt;
 
-	// 1000 Hz
-	double dt = 0.001; // Delta time cycle for this update
 	while(true) {
+		dt = 0.001*AHRS_interval_ms; // Interval (s)
+
 		// Read sensors
 		//attitude_rate = uav->attitude_rate;
 		//acc = uav->acceleration;
@@ -313,6 +334,23 @@ void FlightController::mainIMU() {
 
 		// Apply PID Controllers
 		if(enablePID) {
+
+			// Compute error term for position based off estimation/integration, apply to PIDs as feedback
+			if(cmd.enableLatPID) {
+				error = cmd.posCmd[XAXIS] - pos[XAXIS];
+				cmd.velCmd[XAXIS] = posPID[XAXIS].update(error, dt);
+//				error = cmd.posCmd[YAXIS] - pos[YAXIS];
+//				cmd.velCmd[YAXIS] = posPID[YAXIS].update(error, dt);
+
+				error = cmd.velCmd[XAXIS] - vel[XAXIS];
+				cmd.attCmd[PITCH] = -velPID[XAXIS].update(error, dt);
+//				error = cmd.velCmd[YAXIS] - vel[YAXIS];
+//				cmd.attCmd[PITCH] = -velPID[YAXIS].update(error, dt);
+
+				constrain(cmd.attCmd[PITCH], -M_PI_4, M_PI_4);
+				constrain(cmd.attCmd[ROLL], -M_PI_4, M_PI_4);
+			}
+
 			// Compute error terms for roll and pitch in attitude mode, apply to PIDs as feedback
 			if(cmd.enableAttPID) {
 				error = wrapRadians(cmd.attCmd[ROLL] - attitude[ROLL]);
@@ -326,7 +364,6 @@ void FlightController::mainIMU() {
 			// Compute error terms for roll, pitch and yaw from rate, apply to PIDs as feedback
 			error = cmd.rateCmd[ROLL] - attitude_rate[ROLL];
 			ratePID[ROLL].update(error, dt);
-
 			error = cmd.rateCmd[PITCH] + attitude_rate[PITCH];
 			ratePID[PITCH].update(error, dt);
 			error = cmd.rateCmd[YAW] - attitude_rate[YAW];
@@ -387,7 +424,7 @@ void FlightController::mainIMU() {
 				outfile << sc_time_stamp() << motor[0] << "\t" << motor [1] << "\t" << motor [2] << "\t" << motor [3] << endl;
 			}
 		}
-		wait(1, SC_MS);
+		wait(AHRS_interval_ms, SC_MS);
 	}
 }
 

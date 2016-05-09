@@ -117,7 +117,7 @@ public:
 class uav_can_bus : public sc_module, public uav_can_if
 {
 private:
-	bool idle, ack, interframe;
+	bool idle, ack, interframe, display;
 	unsigned char priorityHigh;
 	double period_ns;
 	uav_can_msg currentMessage;
@@ -128,7 +128,16 @@ public:
 	uav_can_bus(sc_module_name name, double freq) : sc_module(name)
 	{
 		SC_THREAD(arbiter);
+		setFrequency(freq);
+		display = false;
+	}
+
+	void setFrequency(double freq) {
 		period_ns = (1000000000.0/freq);
+	}
+
+	void showTraffic(bool b) {
+		display = b;
 	}
 
 	unsigned can_listen(uav_can_msg &msg)
@@ -181,6 +190,8 @@ public:
 			wait(34*period_ns,SC_NS);	// Time for header
 			priorityCheck.notify();
 			wait(frameLoaded);
+			if(display)
+				cout << "[" << sc_time_stamp() << "] UAVCAN message (msg=" << (unsigned)currentMessage.msgID <<  ", src=" << (unsigned)currentMessage.sourceID << ", dest=" << (unsigned)currentMessage.destID << ")" << endl;
 			wait(27*period_ns,SC_NS);
 			wait(currentMessage.length()*8*period_ns,SC_NS);
 			wait(((61+currentMessage.length()*8)/5)*period_ns,SC_NS); //stuffing estimation

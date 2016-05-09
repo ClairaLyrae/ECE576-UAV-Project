@@ -11,12 +11,6 @@ using namespace std;
 class Aerodynamics : public PhysicsComponent
 {
 public:
-	double drag_coeff;
-
-	Aerodynamics(double cdrag) {
-		this->drag_coeff = cdrag;
-	}
-
 	void update(double delta, PhysicsSim &sim, PhysicsObject &parent) {
 		// Velocity normal
 		Vec3d vnorm(parent.velocity);
@@ -26,7 +20,7 @@ public:
 		double area = parent.dimensions[0]*parent.dimensions[1];
 
 		// Find linear drag force
-		double drag = -0.5*drag_coeff*area*sim.density*lengthSquared(parent.velocity);
+		double drag = -0.5*parent.drag_coeff*area*sim.density*lengthSquared(parent.velocity);
 		Vec3d dragforce = vnorm*drag;
 
 		// Find drag torque

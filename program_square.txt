@@ -1,0 +1,19 @@
+#################################################
+# UAV Simulation Program Example
+#################################################
+
+# Set the flight mode flags (attitude PID, pos PID, lateral pos PID, N/A)
+mode 1,1,1,0
+att 10,0,0
+wait 4000
+att 0,10,0
+pos 0,0,5
+wait 4000
+att -10,0,0
+pos 0,0,10
+wait 4000
+att 0,-10,0
+pos 0,0,15
+wait 4000
+
+	
