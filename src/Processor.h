@@ -149,7 +149,8 @@ public:
 			ss >> str_cmd >> str_val;
 			if(strcasecmp(str_cmd.c_str(), "wait") == 0) {
 				hasValues = false;
-				wait(atof(str_val.c_str()), SC_MS);
+				wait_time = atof(str_val.c_str());
+				wait(wait_time, SC_MS);
 				if(pid_test_verbose) cout << "[" << sc_time_stamp() << "] Processor waiting " << wait_time << "ms" << endl;
 			} else if(strcasecmp(str_cmd.c_str(), "pos") == 0) {
 				hasValues = true;
@@ -202,16 +203,15 @@ public:
 			if (msg.isBroadcast()) {
 				switch(msg.msgID) {
 					case UAVCAN_GPS_LAT:
-
-						cout << "[" << sc_time_stamp() << "] Processor received GPS Latitude" << endl;
+						// cout << "[" << sc_time_stamp() << "] Processor received GPS Latitude" << endl;
 						msg.unpackFloat32(gps_latitude);
 						break;
 					case UAVCAN_GPS_LONG:
-						cout << "[" << sc_time_stamp() << "] Processor received GPS Longitude" << endl;
+						// cout << "[" << sc_time_stamp() << "] Processor received GPS Longitude" << endl;
 						msg.unpackFloat32(gps_longitude);
 						break;
 					case UAVCAN_GPS_HVA:
-						cout << "[" << sc_time_stamp() << "] Processor received GPS HVA" << endl;
+						// cout << "[" << sc_time_stamp() << "] Processor received GPS HVA" << endl;
 						msg.unpackFloat16(gps_heading, gps_velocity, gps_altitude);
 						break;
 					default:

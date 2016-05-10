@@ -18,20 +18,25 @@ uav_motor_max_torque = 0.181232337
 
 # UAVCAN bus
 uavcan_bus_frequency = 1000000
+uavcan_bus_verbose = false
+gps_broadcast_enable = true
+gps_broadcast_rate = 10
+# Traffic generator
 uavcan_traffic_enable = true
-uavcan_show_traffic = true
+# Traffic generator period (ms)
+uavcan_traffic_rate_min = 0.1
+uavcan_traffic_rate_range = 50
+# Traffic generator payload size (bytes, max 7 total)
+uavcan_traffic_size_min = 2
+uavcan_traffic_size_range = 5
 
 # I2C bus
 i2c_bus_frequency = 400000
-i2c_show_traffic = false
-
-# Sensor settings
-gps_broadcast_enable = true
-gps_broadcast_rate = 1
-# These correspond to the rate that the sensors are read by the flight controller
+i2c_bus_verbose = false
+# These correspond to the rate that the i2c sensors are read by the flight controller
 acc_gyro_read_rate = 1000
-baro_read_rate = 10
-mag_read_rate = 100
+baro_read_rate = 100
+mag_read_rate = 500
 
 # PID settings (P, I, D, limit, filter state, integrator state)
 pid_att_roll = 2,2,0,1.5707,0,0

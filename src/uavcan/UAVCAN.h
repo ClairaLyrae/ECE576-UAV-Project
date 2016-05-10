@@ -41,6 +41,10 @@ public:
 		return paylength;
 	}
 
+	void packEmpty(unsigned len) {
+		paylength = len;
+	}
+
 	void packByteFloat16(uint8_t head, float fa, float fb, float fc) {
 		uint16_t half;
 		payload[0] = head;
@@ -122,6 +126,10 @@ private:
 	double period_ns;
 	uav_can_msg currentMessage;
 
+	// Stats
+	sc_time time_start;
+	sc_time time_active;
+	unsigned long message_count;
 public:
 	SC_HAS_PROCESS(uav_can_bus);
 
@@ -130,6 +138,9 @@ public:
 		SC_THREAD(arbiter);
 		setFrequency(freq);
 		display = false;
+		time_start = SC_ZERO_TIME;
+		time_active = SC_ZERO_TIME;
+		message_count = 0;
 	}
 
 	void setFrequency(double freq) {
@@ -175,8 +186,21 @@ public:
 		return ack;
 	}
 
+	double utilization() {
+		sc_time tot = sc_time_stamp() - time_start;
+		return time_active.to_seconds()/tot.to_seconds();
+	}
+
+	long numTransactions() {
+		return message_count;
+	}
+
 	void arbiter()
 	{
+		sc_time time_trans;
+		time_start = sc_time_stamp();
+		time_active = SC_ZERO_TIME;
+		message_count = 0;
 		while(true)
 		{
 			priorityHigh = 32;
@@ -184,14 +208,17 @@ public:
 			interframe = false;
 			idle = true;
 			canIdle.notify();	// Notify listeners that bus is ready for transactions
-			wait(sof);
+			wait(sof);			// Wait for transaction
+
+			// Recieved frame
+			time_trans = sc_time_stamp();
 			wait(period_ns,SC_NS);
 			idle = false;
 			wait(34*period_ns,SC_NS);	// Time for header
 			priorityCheck.notify();
 			wait(frameLoaded);
 			if(display)
-				cout << "[" << sc_time_stamp() << "] UAVCAN message (msg=" << (unsigned)currentMessage.msgID <<  ", src=" << (unsigned)currentMessage.sourceID << ", dest=" << (unsigned)currentMessage.destID << ")" << endl;
+				cout << "[" << sc_time_stamp() << "] UAVCAN message (msg=" << (unsigned)currentMessage.msgID <<  ", src=" << (unsigned)currentMessage.sourceID << ", dest=" << (unsigned)currentMessage.destID << ", size=" << currentMessage.length() << ")" << endl;
 			wait(27*period_ns,SC_NS);
 			wait(currentMessage.length()*8*period_ns,SC_NS);
 			wait(((61+currentMessage.length()*8)/5)*period_ns,SC_NS); //stuffing estimation
@@ -200,6 +227,8 @@ public:
 			interframe = true;
 			canRelease.notify();
 			wait(3*period_ns,SC_NS);
+			time_active += sc_time_stamp() - time_trans;
+			message_count++;
 		}
 	}
 

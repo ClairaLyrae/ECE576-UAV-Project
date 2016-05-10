@@ -5,36 +5,63 @@
 #include "UAVCAN.h"
 #include "FrameTypes.h"
 
-class uavcan_traffic_gen : public sc_module
+class FrameGenerator : public sc_module
 {
+private:
+	double wait_min, wait_var;
+	unsigned len_min, len_var;
+	unsigned CAN_PRIORITY, CAN_NODE;
+	bool en;
 public:
 	sc_port<uav_can_if> canif;
 
-	SC_HAS_PROCESS(uavcan_traffic_gen);
+	SC_HAS_PROCESS(FrameGenerator);
 
-	uavcan_traffic_gen(sc_module_name name, unsigned freq_min, unsigned freq_rng, unsigned char priority, unsigned char node) : sc_module(name), wait_min(freq_min), wait_var(freq_rng), CAN_PRIORITY(priority), CAN_NODE(node)
+	FrameGenerator(sc_module_name name, unsigned priority, unsigned node) : sc_module(name), CAN_PRIORITY(priority), CAN_NODE(node)
 	{
-		SC_THREAD(noise);
+		SC_THREAD(main);
+		en = true;
+		len_var = 0;
+		len_min = 7;
+		wait_var = 1000;
+		wait_min = 100;
 	}
 
-	void noise()
+	void setSize(unsigned range, unsigned min) {
+		len_var = range;
+		len_min = min;
+		if(len_min > 7)
+			len_min = 7;
+		if(len_min + len_var > 7)
+			len_var += (7 - len_var + len_min);
+	}
+
+	void setRate(double range, double min) {
+		wait_var = range;
+		wait_min = min;
+	}
+
+	void setPriority(unsigned p) {
+		CAN_PRIORITY = p;
+	}
+
+	void enable(bool b) {
+		en = b;
+	}
+
+	void main()
 	{
 		uav_can_msg msg;
 		srand(time(0));
-		while(1)
-		{
-			wait(rand() % wait_var + wait_min, SC_NS);
+		while(true)	{
+			wait(((double)rand()/RAND_MAX)*wait_var + wait_min, SC_MS);
 			while(!canif->can_transmit(CAN_PRIORITY))
 				canif->can_listen(msg);
 			msg.set(UAVCAN_TRAFFIC, 0, CAN_NODE, 0);
+			msg.packEmpty((rand() % len_var) + len_min);
 			canif->can_message(msg);
 		}
 	}
-
-private:
-	unsigned wait_min, wait_var;
-	unsigned int CAN_PRIORITY, CAN_NODE;
 };
-
 
 #endif

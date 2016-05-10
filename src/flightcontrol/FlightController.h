@@ -122,7 +122,7 @@ public:
 		SC_THREAD(mainI2C);
 		SC_THREAD(mainIMU);
 		SC_THREAD(mainTimer);
-		//SC_THREAD(mainPilot);
+		SC_THREAD(mainPWM);
 		SC_THREAD(mainUAVCAN);
 
 		this->sim = physim;
@@ -147,11 +147,12 @@ public:
 		cmd.attCmd[ROLL] = 0;	cmd.attCmd[PITCH] = 0;	cmd.attCmd[YAW] = 0;
 		cmd.rateCmd[ROLL] = 0;	cmd.rateCmd[PITCH] = 0;	cmd.rateCmd[YAW] = 0;
 		AHRS_interval_ms = 1;
-		I2C_baro_interval_ms = 100;
-		I2C_acc_gyro_interval_ms = 1;
-		I2C_mag_interval_ms = 10;
+		I2C_baro_interval_ms = 1000;
+		I2C_acc_gyro_interval_ms = 10;
+		I2C_mag_interval_ms = 100;
 	}
 
+	void mainPWM();
 	void mainIMU();
 	void mainPilot();
 	void mainI2C();
@@ -159,13 +160,13 @@ public:
 	void mainUAVCAN();
 
 	void setMagRate(double rate) {
-		I2C_mag_interval_ms = (int)(1000.0/rate);
+		I2C_mag_interval_ms = (int)(10000.0/rate);
 	}
 	void setAccGyroRate(double rate) {
-		I2C_acc_gyro_interval_ms = (int)(1000.0/rate);
+		I2C_acc_gyro_interval_ms = (int)(10000.0/rate);
 	}
 	void setBaroRate(double rate) {
-		I2C_baro_interval_ms = (int)(1000.0/rate);
+		I2C_baro_interval_ms = (int)(10000.0/rate);
 	}
 
 	void setThrottle(double m1, double m2, double m3, double m4) {
@@ -229,6 +230,14 @@ public:
 // System C Threads
 /////////////////////////////////////////////////
 
+// Updates motor PWM output
+void FlightController::mainPWM() {
+	while(true) {
+		writeAllMotors();
+		wait(1, SC_MS);
+	}
+}
+
 // Internal timer, generates interrupts at specific intervals
 // Also updates the motor PWM outputs
 void FlightController::mainTimer() {
@@ -237,21 +246,27 @@ void FlightController::mainTimer() {
 	I2C_acc_gyro_update = false;
 	I2C_baro_update = false;
 	while(true) {
-		// 1000Hz timer
-		writeAllMotors();
-		wait(1, SC_MS);
 		updateCycle++;
-		if(updateCycle >= 1000)
+		if(updateCycle >= 100000)	// Roll over every 10s
 			updateCycle = 0;
-		if(I2C_mag_update || I2C_acc_gyro_update || I2C_baro_update) {
-			cout << "[" << sc_time_stamp() << "] I2C Bus error: unserviced request" << endl;
-			sc_stop();
+		if((updateCycle%I2C_baro_interval_ms == 0)) {
+			if(I2C_mag_update)
+				cout << "[" << sc_time_stamp() << "] I2C Bus error: unserviced baro request" << endl;
+			I2C_baro_update = true;
 		}
-		I2C_baro_update = (updateCycle%I2C_baro_interval_ms == 0) ? true : false;
-		I2C_acc_gyro_update = (updateCycle%I2C_acc_gyro_interval_ms == 0) ? true : false;
-		I2C_mag_update = (updateCycle%I2C_mag_interval_ms == 0) ? true : false;
+		if((updateCycle%I2C_acc_gyro_interval_ms == 0)) {
+			if(I2C_mag_update)
+				cout << "[" << sc_time_stamp() << "] I2C Bus error: unserviced acc/gyro request" << endl;
+			I2C_acc_gyro_update = true;
+			}
+		if((updateCycle%I2C_mag_interval_ms == 0)) {
+			if(I2C_mag_update)
+				cout << "[" << sc_time_stamp() << "] I2C Bus error: unserviced mag request" << endl;
+			I2C_mag_update = true;
+		}
 		if(I2C_mag_update || I2C_acc_gyro_update || I2C_baro_update)
 			timerInterrupt.notify();
+		wait(0.1, SC_MS);	// 100us interval
 	}
 }
 
@@ -271,15 +286,10 @@ void FlightController::mainI2C() {
 			i2c_mst->i2c_read(LSM6DS3::I2C_ADDRESS, LSM6DS3::REG_GYRO_X_L, 12, buffer);
 			for (i = 0; i < 3; i++) {
 				raw = ((buffer[2*i + 1] << 8) + buffer[2*i]);
-				//cout << "Gyro raw = [" << raw << "]" << endl;
 				sensor.gyro[i] = (((int16_t)raw)/(LSM6DS3::GYRO_SCALE_FACTOR) + GYRO_SCALE_BIAS)*(M_PI/180);
-
 				raw = ((buffer[6 + (2*i + 1)] << 8) + buffer[6 + 2*i]);
-				//cout << "Acc raw = [" << raw << "]" << endl;
 				sensor.accel[i] = ((int16_t)raw)/(LSM6DS3::ACC_SCALE_FACTOR) + ACCEL_SCALE_BIAS;
 			}
-			//cout << "Gyro = [" << attitude_rate << ", (" << sensor.gyro[ROLL] << ", " << sensor.gyro[PITCH] << ", " << sensor.gyro[YAW] << ")]" << endl;
-			//cout << "Acc = [" << acc << ", (" << sensor.accel[XAXIS] << ", " << sensor.accel[YAXIS] << ", " << sensor.accel[ZAXIS] << ")]" << endl;
 			I2C_acc_gyro_update = false;
 		}
 
@@ -438,15 +448,15 @@ void FlightController::mainUAVCAN() {
 			switch(msg.msgID) {
 				case UAVCAN_GPS_LAT:
 					msg.unpackFloat32(sensor.gps_latitude);
-					cout << "[" << sc_time_stamp() << "] Flight controller received GPS Latitude" << endl;
+					// cout << "[" << sc_time_stamp() << "] Flight controller received GPS Latitude" << endl;
 					break;
 				case UAVCAN_GPS_LONG:
 					msg.unpackFloat32(sensor.gps_longitude);
-					cout << "[" << sc_time_stamp() << "] Flight controller received GPS Longitude" << endl;
+					// cout << "[" << sc_time_stamp() << "] Flight controller received GPS Longitude" << endl;
 					break;
 				case UAVCAN_GPS_HVA:
 					msg.unpackFloat16(sensor.gps_heading, sensor.gps_velocity, sensor.gps_altitude);
-					cout << "[" << sc_time_stamp() << "] Flight controller received GPS HVA" << endl;
+					// cout << "[" << sc_time_stamp() << "] Flight controller received GPS HVA" << endl;
 					break;
 				default:
 					break;
