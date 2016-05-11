@@ -79,10 +79,17 @@ private:
 
 	double AHRS_interval_ms;
 
+	bool UAVCAN_report_pos;
+	bool UAVCAN_report_vel;
+	bool UAVCAN_report_att;
+	bool UAVCAN_report_rate;
+	double UAVCAN_interval_ms;
+
 	PhysicsSim *sim;
 	PhysicsObject *uav;
 public:
-	static const unsigned char CAN_NODE = 2;
+	static unsigned CAN_NODE;
+	static unsigned CAN_PRIORITY;
 
 	// Ports
 	sc_port<i2c_mst_if> i2c_mst;
@@ -124,6 +131,7 @@ public:
 		SC_THREAD(mainTimer);
 		SC_THREAD(mainPWM);
 		SC_THREAD(mainUAVCAN);
+		SC_THREAD(mainUAVCANOut);
 
 		this->sim = physim;
 		this->uav = vehicle;
@@ -150,6 +158,11 @@ public:
 		I2C_baro_interval_ms = 1000;
 		I2C_acc_gyro_interval_ms = 10;
 		I2C_mag_interval_ms = 100;
+		UAVCAN_report_pos = false;
+		UAVCAN_report_vel = false;
+		UAVCAN_report_att = false;
+		UAVCAN_report_rate = false;
+		UAVCAN_interval_ms = 100;
 	}
 
 	void mainPWM();
@@ -158,6 +171,7 @@ public:
 	void mainI2C();
 	void mainTimer();
 	void mainUAVCAN();
+	void mainUAVCANOut();
 
 	void setMagRate(double rate) {
 		I2C_mag_interval_ms = (int)(10000.0/rate);
@@ -174,6 +188,17 @@ public:
 		motor[1] = m2;
 		motor[2] = m3;
 		motor[3] = m4;
+	}
+
+	void enableAHRSReports(bool p, bool v, bool a, bool r) {
+		UAVCAN_report_pos = p;
+		UAVCAN_report_vel = v;
+		UAVCAN_report_att = a;
+		UAVCAN_report_rate = r;
+	}
+
+	void setAHRSReportRate(double freq) {
+		UAVCAN_interval_ms = 1000.0/freq;
 	}
 
 	void writeAllMotors() {
@@ -219,6 +244,15 @@ public:
 	        return maxValue;
 	    else
 	        return input;
+	}
+
+	void sendFlightReport(uint8_t header, float x, float y, float z) {
+		uav_can_msg msg;
+		while(!canif->can_transmit(CAN_PRIORITY))
+			canif->can_listen(msg);
+		msg.set(UAVCAN_FLIGHT_REP, 0, CAN_NODE, 0);
+		msg.packByteFloat16(header, x, y, z);
+		canif->can_message(msg);
 	}
 
 	~FlightController() {
@@ -503,5 +537,31 @@ void FlightController::mainUAVCAN() {
 		}
 	}
 }
+
+
+void FlightController::mainUAVCANOut() {
+	while(true) {
+		if(UAVCAN_report_pos) {
+			cout << "[" << sc_time_stamp() << "] Flight controller reported pos: " << pos[XAXIS] << " m, " << pos[YAXIS] << " m, " << pos[ZAXIS] << " m" << endl;
+			sendFlightReport(0x00, (float)pos[XAXIS], (float)pos[YAXIS], (float)pos[ZAXIS]);
+		}
+		if(UAVCAN_report_vel) {
+			cout << "[" << sc_time_stamp() << "] Flight controller reported vel: " << pos[XAXIS] << " m/s, " << pos[YAXIS] << " m/s, " << pos[ZAXIS] << " m/s" << endl;
+			sendFlightReport(0x01, (float)vel[XAXIS], (float)vel[YAXIS], (float)vel[ZAXIS]);
+		}
+		if(UAVCAN_report_att) {
+			cout << "[" << sc_time_stamp() << "] Flight controller reported att: " << attitude[ROLL] << " deg, " << attitude[PITCH] << " deg, " << attitude[YAW] << " deg" << endl;
+			sendFlightReport(0x02, (float)attitude[XAXIS], (float)attitude[YAXIS], (float)attitude[ZAXIS]);
+		}
+		if(UAVCAN_report_rate) {
+			cout << "[" << sc_time_stamp() << "] Flight controller reported rate: " << attitude_rate[ROLL] << " deg/s, " << attitude_rate[PITCH] << " deg/s, " << attitude_rate[YAW] << " deg/s" << endl;
+			sendFlightReport(0x03, (float)attitude_rate[XAXIS], (float)attitude_rate[YAXIS], (float)attitude_rate[ZAXIS]);
+		}
+		wait(UAVCAN_interval_ms, SC_MS);
+	}
+}
+
+unsigned FlightController::CAN_NODE = 2;
+unsigned FlightController::CAN_PRIORITY = 2;
 
 #endif

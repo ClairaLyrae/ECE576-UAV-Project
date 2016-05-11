@@ -117,7 +117,7 @@ public:
 		hardware->canif(*can_bus);
 
 		// Traffic generator (UAVCAN)
-		traffic = new FrameGenerator("TRAFFIC_GEN", 20, 15);
+		traffic = new FrameGenerator("TRAFFIC_GEN");
 		traffic->canif(*can_bus);
 	}
 };
@@ -211,6 +211,16 @@ int sc_main(int argc, char *argv[]) {
 	top_inst.traffic->enable(conf.getBool("uavcan_traffic_enable"));
 	top_inst.sensor_gps->setBroadcastRate(conf.getDouble("gps_broadcast_rate"));
 	top_inst.sensor_gps->enableBroadcast(conf.getBool("gps_broadcast_enable"));
+	top_inst.hardware->setAHRSReportRate(conf.getDouble("ahrs_report_freq"));
+	top_inst.hardware->enableAHRSReports(conf.getBool("ahrs_report_pos"), conf.getBool("ahrs_report_vel"), conf.getBool("ahrs_report_att"), conf.getBool("ahrs_report_rate"));
+	Processor::CAN_PRIORITY = conf.getInt("processor_priority");
+	FlightController::CAN_PRIORITY = conf.getInt("flight_controller_priority");
+	FrameGenerator::CAN_PRIORITY = conf.getInt("uavcan_traffic_priority");
+	A2235H::CAN_PRIORITY = conf.getInt("gps_priority");
+	Processor::CAN_NODE = conf.getInt("processor_node");
+	FlightController::CAN_NODE = conf.getInt("flight_controller_node");
+	FrameGenerator::CAN_NODE = conf.getInt("uavcan_traffic_node");
+	A2235H::CAN_NODE = conf.getInt("gps_node");
 
 	// Start simulation
 	cout << "Beginning simulation..." << endl << endl;

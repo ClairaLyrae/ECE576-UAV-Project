@@ -12,12 +12,14 @@
 #include "flightcontrol/FlightController.h"
 #include "uavcan/UAVCAN.h"
 #include "uavcan/FrameTypes.h"
+#include "gmtl/gmtl.h"
+
+using namespace gmtl;
 
 // Processor Module
 class Processor : public sc_module
 {
 private:
-	float gps_latitude, gps_longitude, gps_heading, gps_altitude, gps_velocity;
 	float pid_test_period_ms;
 	bool pid_test_verbose;
 	unsigned pid_test;
@@ -27,8 +29,12 @@ private:
 	ifstream progfile;
 
 public:
-	static const unsigned char CAN_NODE = 1;
-	static const unsigned char CAN_PRIORITY = 5;
+
+	static unsigned CAN_NODE;
+	static unsigned CAN_PRIORITY;
+
+	float gps_latitude, gps_longitude, gps_heading, gps_altitude, gps_velocity;
+	Vec3d pos, vel, att, rate;
 
 	SC_HAS_PROCESS(Processor);
 
@@ -106,7 +112,7 @@ public:
 					sendFlightCommand(0x81, 0.0, 0.0, tgt);
 					break;
 				case 3:
-					tgt = ((float)rand()/RAND_MAX)*M_PI;
+					tgt = ((float)rand()/RAND_MAX)*(M_PI/2) - (M_PI/4);
 					if(pid_test_verbose) cout << "[" << sc_time_stamp() << "] Processor sent yaw command of " << tgt*180/M_PI << " deg" << endl;
 					sendFlightCommand(0xC2, 0.0, 0.0, tgt);
 					break;
@@ -133,7 +139,7 @@ public:
 	}
 
 	void testProgram() {
-		unsigned i, type;
+		unsigned i;
 		uint8_t flags;
 		float values[3], wait_time;
 		string temp, str, str_cmd, str_val;
@@ -142,6 +148,8 @@ public:
 
 		while(!progfile.eof()) {
 			getline(progfile, str);
+			if(str.length() == 0)
+				break;
 			c = str.at(0);
 			if(c == '#' || c == '\n' || c == '\r' || c == ' ')
 				continue;
@@ -168,6 +176,8 @@ public:
 				hasValues = true;
 				inDeg = true;
 				flags = (flags & 0xF0) | 0x03;
+			} else if(strcasecmp(str_cmd.c_str(), "stop") == 0) {
+				sc_stop();
 			} else if(strcasecmp(str_cmd.c_str(), "mode") == 0) {
 				hasValues = false;
 				flags = 0x00;
@@ -187,8 +197,8 @@ public:
 					if(inDeg)
 						values[i] *= DEG_TO_RAD;
 				}
-				sendFlightCommand(flags, values[0], values[1], values[2]);
 				if(pid_test_verbose) cout << "[" << sc_time_stamp() << "] Processor sent command (" << (unsigned)flags << ") of " << values[0] << ", " << values[1] << ", " << values[2] << endl;
+				sendFlightCommand(flags, values[0], values[1], values[2]);
 			}
 		}
 		progfile.close();
@@ -214,13 +224,36 @@ public:
 						// cout << "[" << sc_time_stamp() << "] Processor received GPS HVA" << endl;
 						msg.unpackFloat16(gps_heading, gps_velocity, gps_altitude);
 						break;
+					case UAVCAN_FLIGHT_REP:
+						uint8_t flags;
+						float x, y, z;
+						msg.unpackByteFloat16(flags, x, y, z);
+						cout << "[" << sc_time_stamp() << "] Processor received flight report (" << (unsigned)flags << ")" << endl;
+						switch(flags) {
+						case 0x00:
+							pos.set(x, y, z);
+							break;
+						case 0x01:
+							vel.set(x, y, z);
+							break;
+						case 0x02:
+							att.set(x, y, z);
+							break;
+						case 0x03:
+							rate.set(x, y, z);
+							break;
+						}
+						break;
 					default:
+						cout << "[" << sc_time_stamp() << "] Processor received unknown message" << endl;
 						break;
 				}
 			}
 		}
 	}
-
 };
+
+unsigned Processor::CAN_NODE = 1;
+unsigned Processor::CAN_PRIORITY = 1;
 
 #endif

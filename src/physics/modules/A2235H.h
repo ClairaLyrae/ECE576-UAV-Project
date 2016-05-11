@@ -22,8 +22,9 @@ private:
 	unsigned registers[128];
 	bool enBroadcast;
 public:
-	static const unsigned char CAN_NODE = 3;
-	static const unsigned char CAN_PRIORITY = 10;
+	static unsigned CAN_NODE;
+	static unsigned CAN_PRIORITY;
+
 	float longitude, latitude, heading, altitude, velocity;
 	double period_ms;
 
@@ -37,6 +38,8 @@ public:
 		longitude = GPS_LONGITUDE;
 		setBroadcastRate(broadcastRate);
 		enBroadcast = true;
+		CAN_NODE = 10;
+		CAN_PRIORITY = 10;
 	}
 
 	void setBroadcastRate(double broadcastRate) {
@@ -90,5 +93,8 @@ public:
 		altitude = parent.position[2];
 	}
 };
+
+unsigned A2235H::CAN_NODE = 3;
+unsigned A2235H::CAN_PRIORITY = 3;
 
 #endif

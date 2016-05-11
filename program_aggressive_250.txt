@@ -165,3 +165,4 @@ wait 250
 pos 0,-1,0
 wait 250
 pos 0,0,0
+stop
